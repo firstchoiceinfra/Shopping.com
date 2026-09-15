@@ -22,7 +22,7 @@ def init_db():
         )
     ''')
     
-    # Tasks Table for CRUD
+    # Tasks Table for CRUD & Kanban
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +43,41 @@ def init_db():
         )
     ''')
     
-    conn.commit()
+    # E-Commerce Products Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            price REAL,
+            stock INTEGER,
+            category TEXT
+        )
+    ''')
+    
+    # E-Commerce Orders Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_name TEXT,
+            items TEXT,
+            total_amount REAL,
+            timestamp TEXT
+        )
+    ''')
+    
+    # Seed default products if table is empty
+    cursor.execute("SELECT COUNT(*) FROM products")
+    if cursor.fetchone()[0] == 0:
+        sample_products = [
+            ("Wireless Mouse", 25.99, 50, "Electronics"),
+            ("Mechanical Keyboard", 79.99, 30, "Electronics"),
+            ("Gaming Headset", 49.99, 25, "Electronics"),
+            ("Notebook", 4.99, 100, "Stationery"),
+            ("Coffee Mug", 12.50, 40, "Lifestyle")
+        ]
+        cursor.executemany("INSERT INTO products (name, price, stock, category) VALUES (?, ?, ?, ?)", sample_products)
+        conn.commit()
+        
     conn.close()
 
 init_db()
@@ -58,7 +92,7 @@ def log_activity(action_text):
 
 # 2. Page Configuration
 st.set_page_config(
-    page_title="Enterprise Streamlit Dashboard",
+    page_title="Enterprise E-Commerce & Dashboard",
     page_layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -69,6 +103,14 @@ st.markdown("""
     .stApp {
         background-color: #F8FAFC;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .kanban-card, .product-card {
+        background-color: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin-bottom: 10px;
+        border-left: 5px solid #3B82F6;
     }
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
@@ -88,6 +130,10 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# Initialize Cart
+if "cart" not in st.session_state:
+    st.session_state.cart = {}
 
 # 4. Sidebar & Mock Authentication
 st.sidebar.title("🔐 Access Control")
@@ -118,8 +164,13 @@ selected_option = st.sidebar.radio(
     "Go to", 
     [
         "Dashboard", 
+        "🔍 Global Master Search", 
+        "🛍️ E-Commerce Store", 
+        "🛒 Shopping Cart", 
+        "📦 Order History",
         "Database Analytics", 
         "Task Manager (CRUD)", 
+        "Kanban Board", 
         "File Uploader", 
         "Feedback", 
         "View Saved Feedback", 
@@ -132,36 +183,180 @@ selected_option = st.sidebar.radio(
 # 5. Main Body Content Based on Sidebar Navigation
 if selected_option == "Dashboard":
     st.title("📊 Executive Performance Dashboard")
-    st.write("Welcome back! Yahan aapke live database metrics hain.")
+    st.write("Welcome back! Yahan aapke live database metrics aur store statistics hain.")
     
     conn = sqlite3.connect('app_database.db')
     t_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM tasks", conn)
+    completed_df = pd.read_sql_query("SELECT COUNT(*) as total FROM tasks WHERE status = 'Completed'", conn)
     f_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM feedback", conn)
+    p_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM products", conn)
+    o_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM orders", conn)
     conn.close()
     
     total_tasks = t_count_df['total'].iloc[0] if not t_count_df.empty else 0
+    completed_tasks = completed_df['total'].iloc[0] if not completed_df.empty else 0
     total_feedbacks = f_count_df['total'].iloc[0] if not f_count_df.empty else 0
+    total_products = p_count_df['total'].iloc[0] if not p_count_df.empty else 0
+    total_orders = o_count_df['total'].iloc[0] if not o_count_df.empty else 0
     
-    col1, col2, col3 = st.columns(3)
-    col1.metric(label="Total Database Tasks", value=total_tasks)
-    col2.metric(label="Total Feedbacks Received", value=total_feedbacks)
-    col3.metric(label="System Status", value="Online 🟢")
+    progress_val = int((completed_tasks / total_tasks) * 100) if total_tasks > 0 else 0
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric(label="Total Tasks", value=total_tasks)
+    col2.metric(label="Store Products", value=total_products)
+    col3.metric(label="Total Orders", value=total_orders)
+    col4.metric(label="Feedbacks", value=total_feedbacks)
+    
+    st.markdown("---")
+    st.subheader("🎯 Overall Project Completion Milestone")
+    st.progress(progress_val, text=f"Project Progress: {progress_val}% Completed")
     
     st.markdown("---")
     st.subheader("📈 General Growth Overview")
-    chart_data = pd.DataFrame(
-        np.random.randn(20, 2),
-        columns=['This Year', 'Last Year']
-    )
+    chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['This Year', 'Last Year'])
     st.line_chart(chart_data)
+
+elif selected_option == "🔍 Global Master Search":
+    st.title("🔍 Global Database Search Bar")
+    st.write("Poore database (Tasks, Products, Orders, aur Feedback) mein ek sath keyword search karein.")
+    
+    search_term = st.text_input("Enter search keyword (e.g., Mouse, Admin, Completed):")
+    
+    if search_term:
+        conn = sqlite3.connect('app_database.db')
+        tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
+        products_df = pd.read_sql_query("SELECT * FROM products", conn)
+        orders_df = pd.read_sql_query("SELECT * FROM orders", conn)
+        feedback_df = pd.read_sql_query("SELECT * FROM feedback", conn)
+        conn.close()
+        
+        st.subheader("📌 Matching Tasks")
+        if not tasks_df.empty:
+            matched_tasks = tasks_df[tasks_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+            st.dataframe(matched_tasks, use_container_width=True)
+            
+        st.subheader("🛍️ Matching Products")
+        if not products_df.empty:
+            matched_prods = products_df[products_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+            st.dataframe(matched_prods, use_container_width=True)
+            
+        st.subheader("📦 Matching Orders")
+        if not orders_df.empty:
+            matched_orders = orders_df[orders_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+            st.dataframe(matched_orders, use_container_width=True)
+            
+        st.subheader("💬 Matching Feedbacks")
+        if not feedback_df.empty:
+            matched_fb = feedback_df[feedback_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+            st.dataframe(matched_fb, use_container_width=True)
+    else:
+        st.info("Kripya upar search bar mein koi keyword type karein.")
+
+elif selected_option == "🛍️ E-Commerce Store":
+    st.title("🛍️ Online Product Store")
+    st.write("Browse products available in the database and add them to your shopping cart.")
+    
+    conn = sqlite3.connect('app_database.db')
+    products_df = pd.read_sql_query("SELECT * FROM products", conn)
+    conn.close()
+    
+    if not products_df.empty:
+        cols = st.columns(3)
+        for index, row in products_df.iterrows():
+            col = cols[index % 3]
+            with col:
+                st.markdown(f"""
+                    <div class="product-card">
+                        <h3>{row['name']}</h3>
+                        <p><b>Category:</b> {row['category']}</p>
+                        <p><b>Price:</b> ${row['price']:.2f}</p>
+                        <p><b>Stock Available:</b> {row['stock']}</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"Add to Cart", key=f"prod_{row['id']}"):
+                    p_id = row['id']
+                    if p_id in st.session_state.cart:
+                        st.session_state.cart[p_id] += 1
+                    else:
+                        st.session_state.cart[p_id] = 1
+                    st.success(f"Added {row['name']} to cart!")
+    else:
+        st.info("No products found in database.")
+
+elif selected_option == "🛒 Shopping Cart":
+    st.title("🛒 Your Shopping Cart")
+    st.write("Review your selected items and proceed to checkout.")
+    
+    if st.session_state.cart:
+        conn = sqlite3.connect('app_database.db')
+        products_df = pd.read_sql_query("SELECT * FROM products", conn)
+        conn.close()
+        
+        cart_items = []
+        total_price = 0.0
+        
+        for p_id, qty in st.session_state.cart.items():
+            product_row = products_df[products_df['id'] == p_id]
+            if not product_row.empty:
+                p_name = product_row['name'].values[0]
+                p_price = product_row['price'].values[0]
+                subtotal = p_price * qty
+                total_price += subtotal
+                cart_items.append({"ID": p_id, "Product": p_name, "Price": p_price, "Quantity": qty, "Subtotal": subtotal})
+                
+        cart_df = pd.DataFrame(cart_items)
+        st.dataframe(cart_df, use_container_width=True)
+        st.markdown(f"### Total Amount: ${total_price:.2f}")
+        
+        col_clear, col_checkout = st.columns(2)
+        with col_clear:
+            if st.button("Clear Cart"):
+                st.session_state.cart = {}
+                st.rerun()
+                
+        with col_checkout:
+            customer_name_input = st.text_input("Customer Name for Order", value="Admin User")
+            if st.button("Place Order Now"):
+                conn = sqlite3.connect('app_database.db')
+                cursor = conn.cursor()
+                items_summary = ", ".join([f"{row['Product']} (x{row['Quantity']})" for row in cart_items])
+                t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                cursor.execute(
+                    "INSERT INTO orders (customer_name, items, total_amount, timestamp) VALUES (?, ?, ?, ?)",
+                    (customer_name_input, items_summary, total_price, t_time)
+                )
+                conn.commit()
+                conn.close()
+                
+                log_activity(f"New order placed by {customer_name_input} for ${total_price:.2f}")
+                st.success("Order placed successfully! Recorded in database.")
+                st.session_state.cart = {}
+                st.rerun()
+    else:
+        st.info("Your shopping cart is empty. Visit the 'E-Commerce Store' tab to add products.")
+
+elif selected_option == "📦 Order History":
+    st.title("📦 Customer Orders History")
+    st.write("View all completed e-commerce transactions.")
+    
+    conn = sqlite3.connect('app_database.db')
+    orders_df = pd.read_sql_query("SELECT * FROM orders", conn)
+    conn.close()
+    
+    if not orders_df.empty:
+        st.dataframe(orders_df, use_container_width=True)
+    else:
+        st.info("No orders found in the database yet.")
 
 elif selected_option == "Database Analytics":
     st.title("📊 Live Database Analytics & Insights")
-    st.write("Yahan aapke saved tasks aur feedback ka visual breakdown dikh raha hai.")
+    st.write("Yahan aapke saved tasks, products, aur feedback ka visual breakdown dikh raha hai.")
     
     conn = sqlite3.connect('app_database.db')
     tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
     feedback_df = pd.read_sql_query("SELECT * FROM feedback", conn)
+    products_df = pd.read_sql_query("SELECT * FROM products", conn)
     conn.close()
     
     if not tasks_df.empty:
@@ -169,11 +364,10 @@ elif selected_option == "Database Analytics":
         status_counts = tasks_df['status'].value_counts()
         st.bar_chart(status_counts)
         
-        st.subheader("⚡ Tasks Count by Priority")
-        priority_counts = tasks_df['priority'].value_counts()
-        st.bar_chart(priority_counts)
-    else:
-        st.info("Analytics ke liye pehle 'Task Manager' section se kuch tasks add karein.")
+    if not products_df.empty:
+        st.markdown("---")
+        st.subheader("🛍️ Product Price Distribution")
+        st.bar_chart(products_df.set_index('name')['price'])
         
     if not feedback_df.empty:
         st.markdown("---")
@@ -238,6 +432,52 @@ elif selected_option == "Task Manager (CRUD)":
     else:
         st.info("Koi task database mein available nahi hai.")
 
+elif selected_option == "Kanban Board":
+    st.title("📌 Project Kanban Board")
+    st.write("Aapke saare tasks status ke mutabiq columns mein display ho rahe hain.")
+    
+    conn = sqlite3.connect('app_database.db')
+    tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
+    conn.close()
+    
+    if not tasks_df.empty:
+        col_pending, col_progress, col_completed = st.columns(3)
+        
+        with col_pending:
+            st.markdown("### ⏳ Pending")
+            pending_tasks = tasks_df[tasks_df['status'] == 'Pending']
+            for _, row in pending_tasks.iterrows():
+                st.markdown(f"""
+                    <div class="kanban-card" style="border-left-color: #EF4444;">
+                        <strong>{row['task_name']}</strong><br>
+                        <small>Priority: {row['priority']} | Hours: {row['hours']}h</small>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+        with col_progress:
+            st.markdown("### 🔄 In Progress")
+            progress_tasks = tasks_df[tasks_df['status'] == 'In Progress']
+            for _, row in progress_tasks.iterrows():
+                st.markdown(f"""
+                    <div class="kanban-card" style="border-left-color: #F59E0B;">
+                        <strong>{row['task_name']}</strong><br>
+                        <small>Priority: {row['priority']} | Hours: {row['hours']}h</small>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+        with col_completed:
+            st.markdown("### ✅ Completed")
+            completed_tasks = tasks_df[tasks_df['status'] == 'Completed']
+            for _, row in completed_tasks.iterrows():
+                st.markdown(f"""
+                    <div class="kanban-card" style="border-left-color: #10B981;">
+                        <strong>{row['task_name']}</strong><br>
+                        <small>Priority: {row['priority']} | Hours: {row['hours']}h</small>
+                    </div>
+                """, unsafe_allow_html=True)
+    else:
+        st.info("Kanban board ke liye pehle 'Task Manager' se kuch tasks add karein.")
+
 elif selected_option == "File Uploader":
     st.title("📂 Dataset Uploader & Visualizer")
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
@@ -291,13 +531,16 @@ elif selected_option == "Reports & Export":
     tasks_export = pd.read_sql_query("SELECT * FROM tasks", conn)
     feedback_export = pd.read_sql_query("SELECT * FROM feedback", conn)
     logs_export = pd.read_sql_query("SELECT * FROM audit_logs", conn)
+    products_export = pd.read_sql_query("SELECT * FROM products", conn)
+    orders_export = pd.read_sql_query("SELECT * FROM orders", conn)
     conn.close()
     
-    # Generate multi-sheet excel file in memory
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         tasks_export.to_excel(writer, sheet_name='Tasks', index=False)
         feedback_export.to_excel(writer, sheet_name='Feedback', index=False)
+        products_export.to_excel(writer, sheet_name='Products', index=False)
+        orders_export.to_excel(writer, sheet_name='Orders', index=False)
         logs_export.to_excel(writer, sheet_name='Audit Logs', index=False)
     excel_data = output.getvalue()
     
