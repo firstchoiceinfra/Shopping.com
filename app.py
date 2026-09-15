@@ -37,10 +37,13 @@ st.markdown("""
 
 # 3. Sidebar Configuration
 st.sidebar.title("🎛️ Control Panel")
-selected_option = st.sidebar.radio("Navigation", ["Dashboard", "Data Analytics", "Settings"])
+selected_option = st.sidebar.radio(
+    "Navigation", 
+    ["Dashboard", "Data Analytics", "File Uploader", "Feedback", "Settings"]
+)
 
 st.sidebar.markdown("---")
-st.sidebar.info("Aap yahan se apne app ke controls manage kar sakte hain.")
+st.sidebar.info("Aap yahan se alag-alag modules ke beech switch kar sakte hain.")
 
 # 4. Main Body Content Based on Sidebar
 if selected_option == "Dashboard":
@@ -64,8 +67,8 @@ if selected_option == "Dashboard":
     st.line_chart(chart_data)
 
 elif selected_option == "Data Analytics":
-    st.title("📁 Data Analytics & Table")
-    st.write("Yahan aap apne datasets ko view aur filter kar sakte hain.")
+    st.title("📁 Data Analytics & Export")
+    st.write("Yahan aap apne dataset ko view kar sakte hain aur CSV file mein download bhi kar sakte hain.")
     
     # Sample DataFrame
     df = pd.DataFrame({
@@ -75,6 +78,50 @@ elif selected_option == "Data Analytics":
     })
     
     st.dataframe(df, use_container_width=True)
+    
+    # Download Button Feature
+    csv_data = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Data as CSV",
+        data=csv_data,
+        file_name='analytics_report.csv',
+        mime='text/csv'
+    )
+
+elif selected_option == "File Uploader":
+    st.title("📂 Upload Your Dataset")
+    st.write("Apna khud ka CSV file upload karein aur quick analysis dekhein.")
+    
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+    
+    if uploaded_file is not None:
+        user_df = pd.read_csv(uploaded_file)
+        st.success("File successfully uploaded!")
+        st.subheader("Data Preview")
+        st.dataframe(user_df.head(), use_container_width=True)
+        
+        st.subheader("Basic Statistics")
+        st.write(user_df.describe())
+    else:
+        st.info("Kripya test karne ke liye ek CSV file upload karein.")
+
+elif selected_option == "Feedback":
+    st.title("💬 User Feedback Form")
+    st.write("Apna anubhav hamare sath share karein.")
+    
+    with st.form("feedback_form"):
+        user_name = st.text_input("Aapka Naam")
+        user_email = st.text_input("Email Address")
+        rating = st.slider("Rating (1 to 5)", 1, 5, 5)
+        comments = st.text_area("Apna Feedback Likhein")
+        
+        submitted = st.form_submit_button("Submit Feedback")
+        
+        if submitted:
+            if user_name and comments:
+                st.success(f"Shukriya {user_name}! Aapka feedback successfully submit ho gaya hai.")
+            else:
+                st.warning("Kripya Naam aur Comments fields zaroor bharein.")
 
 elif selected_option == "Settings":
     st.title("⚙️ Application Settings")
