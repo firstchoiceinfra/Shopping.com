@@ -142,10 +142,12 @@ def log_activity(action_text, notif_category="System"):
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
-# Dynamic CSS Styling based on Theme Choice
+# Dynamic CSS Styling based on Theme Choice (Fixed Table Text Visibility for Dark Mode)
 bg_color = "#0F172A" if st.session_state.dark_mode else "#F8FAFC"
 card_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
 text_color = "#F8FAFC" if st.session_state.dark_mode else "#334155"
+table_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
+table_text = "#FFFFFF" if st.session_state.dark_mode else "#000000"
 
 st.markdown(f"""
     <style>
@@ -161,6 +163,15 @@ st.markdown(f"""
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         margin-bottom: 10px;
         border-left: 5px solid #3B82F6;
+        color: {text_color};
+    }}
+    /* DataFrame & Table Text Fix for Dark/Light Mode */
+    .stDataFrame, .stTable {{
+        background-color: {table_bg};
+        color: {table_text};
+    }}
+    div[data-testid="stDataFrame"] div {{
+        color: {table_text} !important;
     }}
     .stTabs [data-baseweb="tab-list"] {{
         gap: 8px;
@@ -692,7 +703,7 @@ elif selected_option == "View Saved Feedback":
 
 elif selected_option == "Reports & Export":
     st.title("📥 Enterprise Reports & Multi-Sheet Export")
-    st.write("Yahan से aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
+    st.write("Yahan se aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
     
     conn = sqlite3.connect('app_database.db')
     tasks_export = pd.read_sql_query("SELECT * FROM tasks", conn)
