@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import sqlite3
+import io
 from datetime import datetime
 
 # 1. Database Setup & Initialization
@@ -122,6 +123,7 @@ selected_option = st.sidebar.radio(
         "File Uploader", 
         "Feedback", 
         "View Saved Feedback", 
+        "Reports & Export", 
         "Audit Logs", 
         "Settings"
     ]
@@ -215,7 +217,6 @@ elif selected_option == "Task Manager (CRUD)":
     conn.close()
     
     if not tasks_df.empty:
-        # Search & Filter controls
         search_query = st.text_input("🔍 Search Task by Name")
         if search_query:
             tasks_df = tasks_df[tasks_df['task_name'].str.contains(search_query, case=False, na=False)]
@@ -281,6 +282,31 @@ elif selected_option == "View Saved Feedback":
         st.dataframe(feedback_df, use_container_width=True)
     else:
         st.info("Koi feedback nahi mila.")
+
+elif selected_option == "Reports & Export":
+    st.title("📥 Enterprise Reports & Multi-Sheet Export")
+    st.write("Yahan se aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
+    
+    conn = sqlite3.connect('app_database.db')
+    tasks_export = pd.read_sql_query("SELECT * FROM tasks", conn)
+    feedback_export = pd.read_sql_query("SELECT * FROM feedback", conn)
+    logs_export = pd.read_sql_query("SELECT * FROM audit_logs", conn)
+    conn.close()
+    
+    # Generate multi-sheet excel file in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        tasks_export.to_excel(writer, sheet_name='Tasks', index=False)
+        feedback_export.to_excel(writer, sheet_name='Feedback', index=False)
+        logs_export.to_excel(writer, sheet_name='Audit Logs', index=False)
+    excel_data = output.getvalue()
+    
+    st.download_button(
+        label="📥 Download Complete Enterprise Report (.xlsx)",
+        data=excel_data,
+        file_name='enterprise_master_report.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 elif selected_option == "Audit Logs":
     st.title("🛡️ System Audit & Activity Logs")
