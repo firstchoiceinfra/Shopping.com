@@ -4,7 +4,7 @@ import numpy as np
 import sqlite3
 from datetime import datetime
 
-# 1. Database Setup & Initialization (Feedback & Tasks Tables)
+# 1. Database Setup & Initialization
 def init_db():
     conn = sqlite3.connect('app_database.db')
     cursor = conn.cursor()
@@ -96,32 +96,65 @@ st.sidebar.markdown("---")
 st.sidebar.title("🎛️ Navigation Panel")
 selected_option = st.sidebar.radio(
     "Go to", 
-    ["Dashboard", "Task Manager (CRUD)", "Data Analytics", "File Uploader", "Feedback", "View Saved Feedback", "Settings"]
+    ["Dashboard", "Database Analytics", "Task Manager (CRUD)", "File Uploader", "Feedback", "View Saved Feedback", "Settings"]
 )
 
 # 5. Main Body Content Based on Sidebar Navigation
 if selected_option == "Dashboard":
     st.title("📊 Executive Performance Dashboard")
-    st.write("Welcome back! Yahan aapke business ke key metrics hain.")
+    st.write("Welcome back! Yahan aapke live database metrics hain.")
+    
+    # Fetch real counts from DB
+    conn = sqlite3.connect('app_database.db')
+    t_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM tasks", conn)
+    f_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM feedback", conn)
+    conn.close()
+    
+    total_tasks = t_count_df['total'].iloc[0] if not t_count_df.empty else 0
+    total_feedbacks = f_count_df['total'].iloc[0] if not f_count_df.empty else 0
     
     col1, col2, col3 = st.columns(3)
-    col1.metric(label="Total Revenue", value="$54,200", delta="+10.4%")
-    col2.metric(label="Active Users", value="1,820", delta="+15%")
-    col3.metric(label="Bounce Rate", value="2.1%", delta="-0.8%")
+    col1.metric(label="Total Database Tasks", value=total_tasks)
+    col2.metric(label="Total Feedbacks Received", value=total_feedbacks)
+    col3.metric(label="System Status", value="Online 🟢")
     
     st.markdown("---")
-    st.subheader("📈 Growth Trend Analysis")
+    st.subheader("📈 General Growth Overview")
     chart_data = pd.DataFrame(
         np.random.randn(20, 2),
         columns=['This Year', 'Last Year']
     )
     st.line_chart(chart_data)
 
+elif selected_option == "Database Analytics":
+    st.title("📊 Live Database Analytics & Insights")
+    st.write("Yahan aapke saved tasks aur feedback ka visual breakdown dikh raha hai.")
+    
+    conn = sqlite3.connect('app_database.db')
+    tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
+    feedback_df = pd.read_sql_query("SELECT * FROM feedback", conn)
+    conn.close()
+    
+    if not tasks_df.empty:
+        st.subheader("📌 Tasks Count by Status")
+        status_counts = tasks_df['status'].value_counts()
+        st.bar_chart(status_counts)
+        
+        st.subheader("⚡ Tasks Count by Priority")
+        priority_counts = tasks_df['priority'].value_counts()
+        st.bar_chart(priority_counts)
+    else:
+        st.info("Analytics ke liye pehle 'Task Manager' section se kuch tasks add karein.")
+        
+    if not feedback_df.empty:
+        st.markdown("---")
+        st.subheader("⭐ User Feedback Rating Distribution")
+        rating_counts = feedback_df['rating'].value_counts().sort_index()
+        st.bar_chart(rating_counts)
+
 elif selected_option == "Task Manager (CRUD)":
     st.title("📝 Project Task Manager (Database Powered)")
-    st.write("Yahan aap naye tasks add kar sakte hain aur database wale tasks manage kar sakte hain.")
     
-    # Add Task Form
     with st.form("add_task_form"):
         st.subheader("Add New Task")
         t_name = st.text_input("Task Name")
@@ -156,7 +189,6 @@ elif selected_option == "Task Manager (CRUD)":
     if not tasks_df.empty:
         st.dataframe(tasks_df, use_container_width=True)
         
-        # Delete task section
         task_ids = tasks_df['id'].tolist()
         selected_id_to_delete = st.selectbox("Select Task ID to Delete", options=task_ids)
         if st.button("Delete Selected Task"):
@@ -168,18 +200,7 @@ elif selected_option == "Task Manager (CRUD)":
             st.success(f"Task ID {selected_id_to_delete} deleted successfully!")
             st.rerun()
     else:
-        st.info("Koi task database mein available nahi hai. Upar form se add karein.")
-
-elif selected_option == "Data Analytics":
-    st.title("📁 Advanced Data Analytics & Filtering")
-    df = pd.DataFrame({
-        'Task': ['Design UI', 'Database Setup', 'API Integration', 'Testing'],
-        'Status': ['Completed', 'In Progress', 'Pending', 'Pending'],
-        'Hours': [15, 25, 10, 8],
-        'Priority': ['High', 'High', 'Medium', 'Low']
-    })
-    st.dataframe(df, use_container_width=True)
-    st.bar_chart(df.set_index('Task')['Hours'])
+        st.info("Koi task database mein available nahi hai.")
 
 elif selected_option == "File Uploader":
     st.title("📂 Dataset Uploader & Visualizer")
