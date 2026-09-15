@@ -142,7 +142,11 @@ if "dark_mode" not in st.session_state:
 bg_color = "#0F172A" if st.session_state.dark_mode else "#F8FAFC"
 card_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
 text_color = "#F8FAFC" if st.session_state.dark_mode else "#334155"
+
+# Sidebar background updated to clean light gray for light mode
+sidebar_bg = "#1E293B" if st.session_state.dark_mode else "#F1F5F9"
 sidebar_text = "#FFFFFF" if st.session_state.dark_mode else "#1E293B"
+
 table_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
 table_text = "#FFFFFF" if st.session_state.dark_mode else "#000000"
 input_bg = "#334155" if st.session_state.dark_mode else "#FFFFFF"
@@ -155,8 +159,9 @@ st.markdown(f"""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: {text_color};
     }}
-    /* Fix Sidebar Text Visibility */
+    /* Fix Sidebar Background and Text Visibility */
     section[data-testid="stSidebar"] {{
+        background-color: {sidebar_bg} !important;
         color: {sidebar_text} !important;
     }}
     section[data-testid="stSidebar"] span, 
@@ -724,7 +729,7 @@ elif selected_option == "View Saved Feedback":
 
 elif selected_option == "Reports & Export":
     st.title("📥 Enterprise Reports & Multi-Sheet Export")
-    st.write("Yahan se aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
+    st.write("Yahan से aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
     
     conn = sqlite3.connect('app_database.db')
     tasks_export = pd.read_sql_query("SELECT * FROM tasks", conn)
