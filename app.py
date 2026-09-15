@@ -139,7 +139,7 @@ def log_activity(action_text, notif_category="System"):
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
-# Background color updated to Light Orange (#FFF7ED) for light mode
+# Light Orange Background (#FFF7ED)
 bg_color = "#0F172A" if st.session_state.dark_mode else "#FFF7ED"
 card_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
 text_color = "#F8FAFC" if st.session_state.dark_mode else "#334155"
@@ -169,6 +169,31 @@ st.markdown(f"""
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] div {{
         color: {sidebar_text} !important;
+    }}
+    /* Premium Multicolour Buttons Style */
+    .stButton > button {{
+        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15) !important;
+        transition: all 0.3s ease-in-out;
+    }}
+    .stButton > button:hover {{
+        background: linear-gradient(135deg, #2575fc 0%, #6a11cb 100%) !important;
+        color: white !important;
+        transform: translateY(-2px);
+    }}
+    /* Form Submit Buttons - Emerald Green Gradient */
+    div[data-testid="stFormSubmitButton"] > button {{
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important;
+        color: white !important;
+    }}
+    /* Download Buttons - Sunset Orange/Pink Gradient */
+    div[data-testid="stDownloadButton"] > button {{
+        background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%) !important;
+        color: white !important;
     }}
     /* Fix Input Fields and Select Boxes Contrast */
     input, textarea, select {{
