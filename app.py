@@ -22,7 +22,7 @@ def init_db():
         )
     ''')
     
-    # Tasks Table for CRUD & Kanban
+    # Tasks Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +43,7 @@ def init_db():
         )
     ''')
     
-    # E-Commerce Products Table (Enhanced with Brand, Description, Features, Image URL)
+    # E-Commerce Products Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,13 +58,49 @@ def init_db():
         )
     ''')
     
-    # E-Commerce Orders Table
+    # E-Commerce Orders Table (With GST breakdown)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_name TEXT,
             items TEXT,
+            subtotal REAL,
+            gst_amount REAL,
             total_amount REAL,
+            timestamp TEXT
+        )
+    ''')
+    
+    # Customer CRM Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            email TEXT,
+            phone TEXT,
+            total_purchases REAL,
+            joined_date TEXT
+        )
+    ''')
+    
+    # Support Tickets Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_name TEXT,
+            subject TEXT,
+            description TEXT,
+            status TEXT,
+            timestamp TEXT
+        )
+    ''')
+    
+    # Real-Time Discussion Board Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS discussions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            author TEXT,
+            message TEXT,
             timestamp TEXT
         )
     ''')
@@ -100,15 +136,15 @@ def init_db():
         )
     ''')
     
-    # Seed default products if table is empty
+    # Seed default products if empty
     cursor.execute("SELECT COUNT(*) FROM products")
     if cursor.fetchone()[0] == 0:
         sample_products = [
             ("Wireless Mouse", "LogiTech", 1999.00, 50, "Electronics", "Ergonomic wireless mouse with smooth tracking.", "2.4GHz Wireless, 1000 DPI, Long Battery", "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=300"),
-            ("Mechanical Keyboard", "Razer", 5999.00, 30, "Electronics", "RGB mechanical gaming keyboard with blue switches.", "RGB Backlit, Clicky Switches, Anti-ghosting", "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=300"),
+            ("Mechanical Keyboard", "Razer", 5999.00, 3, "Electronics", "RGB mechanical gaming keyboard with blue switches.", "RGB Backlit, Clicky Switches, Anti-ghosting", "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=300"),
             ("Gaming Headset", "HyperX", 3799.00, 25, "Electronics", "Immersive sound gaming headset with comfy earcups.", "7.1 Surround Sound, Noise Cancelling Mic", "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=300"),
             ("Notebook", "Classmate", 399.00, 100, "Stationery", "High quality ruled pages notebook for office and college.", "200 Pages, Hardbound, Acid-free paper", "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300"),
-            ("Coffee Mug", "Starbucks", 850.00, 40, "Lifestyle", "Ceramic coffee mug for your daily brew.", "Microwave Safe, 350ml Capacity", "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300")
+            ("Coffee Mug", "Starbucks", 850.00, 4, "Lifestyle", "Ceramic coffee mug for your daily brew.", "Microwave Safe, 350ml Capacity", "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300")
         ]
         cursor.executemany("INSERT INTO products (name, brand, price, stock, category, description, features, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", sample_products)
         conn.commit()
@@ -132,10 +168,8 @@ def log_activity(action_text, notif_category="System"):
     conn = sqlite3.connect('app_database.db')
     cursor = conn.cursor()
     t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
     cursor.execute("INSERT INTO audit_logs (action, timestamp) VALUES (?, ?)", (action_text, t_time))
     cursor.execute("INSERT INTO notifications (message, category, timestamp) VALUES (?, ?, ?)", (action_text, notif_category, t_time))
-    
     conn.commit()
     conn.close()
 
@@ -172,7 +206,6 @@ st.markdown(f"""
     section[data-testid="stSidebar"] div {{
         color: {sidebar_text} !important;
     }}
-    /* Premium Multicolour Buttons Style */
     .stButton > button {{
         background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important;
         color: white !important;
@@ -257,15 +290,23 @@ if not st.session_state.logged_in:
     if st.sidebar.button("Login"):
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
+            st.session_state.current_user = "admin"
+            st.session_state.user_role = "Administrator"
             log_activity("Admin logged in successfully.", "Auth")
             st.rerun()
+        elif username == "manager" and password == "manager123":
+            st.session_state.logged_in = True
+            st.session_state.current_user = "manager_john"
+            st.session_state.user_role = "Project Manager"
+            log_activity("Manager logged in successfully.", "Auth")
+            st.rerun()
         else:
-            st.sidebar.error("Invalid Credentials (Try admin / admin123)")
+            st.sidebar.error("Try admin/admin123 or manager/manager123")
     st.stop()
 else:
-    st.sidebar.success("Logged in as Admin")
+    st.sidebar.success(f"Logged in as {st.session_state.current_user} ({st.session_state.user_role})")
     if st.sidebar.button("Logout"):
-        log_activity("Admin logged out.", "Auth")
+        log_activity("User logged out.", "Auth")
         st.session_state.logged_in = False
         st.rerun()
 
@@ -277,13 +318,16 @@ selected_option = st.sidebar.radio(
         "Dashboard", 
         "🔔 Notifications Center",
         "📌 Team Collaboration Notes",
+        "💬 Live Team Chat Board",
+        "🎧 Support Helpdesk Tickets",
         "🔍 Global Master Search", 
         "🛍️ E-Commerce Store", 
         "🛠️ Manage & Edit Products",
-        "🛒 Shopping Cart", 
-        "📦 Order History",
+        "🛒 Shopping Cart & GST Checkout", 
+        "📦 Order History & Tax Invoices",
+        "👥 Customer CRM & Directory",
         "👥 User Roles & Permissions",
-        "Database Analytics", 
+        "Database Analytics & Sales", 
         "Task Manager (CRUD)", 
         "Kanban Board", 
         "File Uploader", 
@@ -295,597 +339,381 @@ selected_option = st.sidebar.radio(
     ]
 )
 
-# Main Body Content Based on Sidebar Navigation
+# Main Navigation Logic
 if selected_option == "Dashboard":
     st.title("📊 Executive Performance Dashboard")
-    st.write("Welcome back! Yahan aapke live database metrics aur store statistics hain.")
-    
     conn = sqlite3.connect('app_database.db')
-    t_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM tasks", conn)
-    completed_df = pd.read_sql_query("SELECT COUNT(*) as total FROM tasks WHERE status = 'Completed'", conn)
-    f_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM feedback", conn)
-    p_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM products", conn)
-    o_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM orders", conn)
+    t_count = pd.read_sql_query("SELECT COUNT(*) as total FROM tasks", conn)['total'].iloc[0]
+    completed_tasks = pd.read_sql_query("SELECT COUNT(*) as total FROM tasks WHERE status = 'Completed'", conn)['total'].iloc[0]
+    total_products = pd.read_sql_query("SELECT COUNT(*) as total FROM products", conn)['total'].iloc[0]
+    total_orders = pd.read_sql_query("SELECT COUNT(*) as total FROM orders", conn)['total'].iloc[0]
+    low_stock = pd.read_sql_query("SELECT COUNT(*) as total FROM products WHERE stock < 5", conn)['total'].iloc[0]
+    open_tickets = pd.read_sql_query("SELECT COUNT(*) as total FROM support_tickets WHERE status = 'Open'", conn)['total'].iloc[0]
     conn.close()
     
-    total_tasks = t_count_df['total'].iloc[0] if not t_count_df.empty else 0
-    completed_tasks = completed_df['total'].iloc[0] if not completed_df.empty else 0
-    total_feedbacks = f_count_df['total'].iloc[0] if not f_count_df.empty else 0
-    total_products = p_count_df['total'].iloc[0] if not p_count_df.empty else 0
-    total_orders = o_count_df['total'].iloc[0] if not o_count_df.empty else 0
-    
-    progress_val = int((completed_tasks / total_tasks) * 100) if total_tasks > 0 else 0
-    
+    if low_stock > 0:
+        st.warning(f"⚠️ **Inventory Alert:** {low_stock} products are running low on stock (< 5 units)!")
+    if open_tickets > 0:
+        st.info(f"🎧 **Support Desk:** {open_tickets} customer support tickets are currently open.")
+        
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric(label="Total Tasks", value=total_tasks)
-    col2.metric(label="Store Products", value=total_products)
-    col3.metric(label="Total Orders", value=total_orders)
-    col4.metric(label="Feedbacks", value=total_feedbacks)
+    col1.metric("Total Tasks", t_count)
+    col2.metric("Products", total_products)
+    col3.metric("Orders", total_orders)
+    col4.metric("Open Tickets", open_tickets)
     
     st.markdown("---")
-    st.subheader("🎯 Overall Project Completion Milestone")
-    st.progress(progress_val, text=f"Project Progress: {progress_val}% Completed")
-    
-    st.markdown("---")
-    st.subheader("📈 General Growth Overview")
-    chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['This Year', 'Last Year'])
-    st.line_chart(chart_data)
+    progress = int((completed_tasks / t_count) * 100) if t_count > 0 else 0
+    st.progress(progress, text=f"Project Milestone Completion: {progress}%")
 
 elif selected_option == "🔔 Notifications Center":
     st.title("🔔 Real-Time Notifications Center")
-    st.write("Yahan aapko system ke sabhi recent alerts aur activities ki live feed milegi.")
-    
     conn = sqlite3.connect('app_database.db')
     notif_df = pd.read_sql_query("SELECT * FROM notifications ORDER BY id DESC", conn)
     conn.close()
-    
-    col_clear, col_refresh = st.columns([1, 4])
-    with col_clear:
-        if st.button("Clear All Notifications"):
-            conn = sqlite3.connect('app_database.db')
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM notifications")
-            conn.commit()
-            conn.close()
-            st.success("All notifications cleared!")
-            st.rerun()
-            
-    if not notif_df.empty:
-        st.markdown("---")
-        for _, row in notif_df.iterrows():
-            st.info(f"**[{row['category']}]** {row['message']} — *{row['timestamp']}*")
-    else:
-        st.info("Abhi koi naya notification nahi hai.")
+    if st.button("Clear Notifications"):
+        conn = sqlite3.connect('app_database.db')
+        conn.cursor().execute("DELETE FROM notifications")
+        conn.commit()
+        conn.close()
+        st.rerun()
+    for _, row in notif_df.iterrows():
+        st.info(f"**[{row['category']}]** {row['message']} — *{row['timestamp']}*")
 
 elif selected_option == "📌 Team Collaboration Notes":
-    st.title("📌 Team Collaboration & Sticky Notes")
-    st.write("Aap aur aapke team members yahan important announcements aur notes share kar sakte hain.")
-    
-    with st.form("add_note_form"):
-        st.subheader("Create New Team Note")
-        note_title = st.text_input("Note Title")
-        note_content = st.text_area("Note Description / Content")
-        note_author = st.text_input("Author Name", value="Admin")
-        
-        submit_note = st.form_submit_button("Publish Note")
-        if submit_note:
-            if note_title and note_content:
-                conn = sqlite3.connect('app_database.db')
-                cursor = conn.cursor()
-                t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                cursor.execute("INSERT INTO team_notes (title, content, author, timestamp) VALUES (?, ?, ?, ?)", (note_title, note_content, note_author, t_time))
-                conn.commit()
-                conn.close()
-                log_activity(f"New team note published by {note_author}: {note_title}", "Notes")
-                st.success("Note published successfully!")
-                st.rerun()
-            else:
-                st.warning("Kripya title aur content dono bharein.")
-                
-    st.markdown("---")
-    st.subheader("📋 Active Team Notes Board")
-    conn = sqlite3.connect('app_database.db')
-    notes_df = pd.read_sql_query("SELECT * FROM team_notes ORDER BY id DESC", conn)
-    conn.close()
-    
-    if not notes_df.empty:
-        for _, row in notes_df.iterrows():
-            st.markdown(f"""
-                <div class="note-card">
-                    <h4>📌 {row['title']}</h4>
-                    <p>{row['content']}</p>
-                    <small><b>Author:</b> {row['author']} | <b>Posted on:</b> {row['timestamp']}</small>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        note_ids = notes_df['id'].tolist()
-        selected_note_id = st.selectbox("Select Note ID to Delete", options=note_ids)
-        if st.button("Delete Selected Note"):
+    st.title("📌 Team Collaboration Notes")
+    with st.form("note_form"):
+        title = st.text_input("Title")
+        content = st.text_area("Content")
+        if st.form_submit_button("Post Note"):
             conn = sqlite3.connect('app_database.db')
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM team_notes WHERE id = ?", (selected_note_id,))
+            conn.cursor().execute("INSERT INTO team_notes (title, content, author, timestamp) VALUES (?, ?, ?, ?)",
+                                  (title, content, st.session_state.current_user, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
             conn.commit()
             conn.close()
-            log_activity(f"Deleted note ID: {selected_note_id}", "Notes")
-            st.success("Note deleted successfully!")
+            st.success("Note published!")
+            st.rerun()
+    conn = sqlite3.connect('app_database.db')
+    notes = pd.read_sql_query("SELECT * FROM team_notes ORDER BY id DESC", conn)
+    conn.close()
+    for _, r in notes.iterrows():
+        st.markdown(f"<div class='note-card'><h4>{r['title']}</h4><p>{r['content']}</p><small>By {r['author']} at {r['timestamp']}</small></div>", unsafe_allow_html=True)
+
+elif selected_option == "💬 Live Team Chat Board":
+    st.title("💬 Real-Time Team Chat")
+    with st.form("chat"):
+        msg = st.text_input("Message")
+        if st.form_submit_button("Send"):
+            conn = sqlite3.connect('app_database.db')
+            conn.cursor().execute("INSERT INTO discussions (author, message, timestamp) VALUES (?, ?, ?)",
+                                  (st.session_state.current_user, msg, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            conn.commit()
+            conn.close()
+            st.rerun()
+    conn = sqlite3.connect('app_database.db')
+    chats = pd.read_sql_query("SELECT * FROM discussions ORDER BY id DESC", conn)
+    conn.close()
+    for _, c in chats.iterrows():
+        st.info(f"**{c['author']}**: {c['message']} — *{c['timestamp']}*")
+
+elif selected_option == "🎧 Support Helpdesk Tickets":
+    st.title("🎧 Customer Support Ticketing System")
+    with st.form("ticket_form"):
+        cust = st.text_input("Customer Name")
+        subj = st.text_input("Subject / Issue")
+        desc = st.text_area("Detailed Description")
+        if st.form_submit_button("Raise Ticket"):
+            conn = sqlite3.connect('app_database.db')
+            conn.cursor().execute("INSERT INTO support_tickets (customer_name, subject, description, status, timestamp) VALUES (?, ?, ?, 'Open', ?)",
+                                  (cust, subj, desc, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            conn.commit()
+            conn.close()
+            st.success("Support ticket registered successfully!")
+            st.rerun()
+    
+    st.markdown("---")
+    st.subheader("Manage Active Support Tickets")
+    conn = sqlite3.connect('app_database.db')
+    tickets = pd.read_sql_query("SELECT * FROM support_tickets", conn)
+    conn.close()
+    if not tickets.empty:
+        st.dataframe(tickets, use_container_width=True)
+        t_id = st.selectbox("Select Ticket ID to Update Status", options=tickets['id'].tolist())
+        new_stat = st.selectbox("New Status", ["Open", "In Progress", "Resolved"])
+        if st.button("Update Ticket Status"):
+            conn = sqlite3.connect('app_database.db')
+            conn.cursor().execute("UPDATE support_tickets SET status = ? WHERE id = ?", (new_stat, t_id))
+            conn.commit()
+            conn.close()
+            st.success("Ticket status updated!")
             st.rerun()
     else:
-        st.info("No team notes available yet.")
+        st.info("No active support tickets.")
 
 elif selected_option == "🔍 Global Master Search":
-    st.title("🔍 Global Database Search Bar")
-    st.write("Poore database mein ek sath keyword search karein.")
-    
-    search_term = st.text_input("Enter search keyword (e.g., Mouse, LogiTech, Completed):")
-    
-    if search_term:
+    st.title("🔍 Global Database Search")
+    q = st.text_input("Keyword search...")
+    if q:
         conn = sqlite3.connect('app_database.db')
-        tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
-        products_df = pd.read_sql_query("SELECT * FROM products", conn)
-        orders_df = pd.read_sql_query("SELECT * FROM orders", conn)
-        feedback_df = pd.read_sql_query("SELECT * FROM feedback", conn)
+        p = pd.read_sql_query("SELECT * FROM products", conn)
+        t = pd.read_sql_query("SELECT * FROM tasks", conn)
         conn.close()
-        
-        st.subheader("📌 Matching Tasks")
-        if not tasks_df.empty:
-            matched_tasks = tasks_df[tasks_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
-            st.dataframe(matched_tasks, use_container_width=True)
-            
-        st.subheader("🛍️ Matching Products")
-        if not products_df.empty:
-            matched_prods = products_df[products_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
-            st.dataframe(matched_prods, use_container_width=True)
-            
-        st.subheader("📦 Matching Orders")
-        if not orders_df.empty:
-            matched_orders = orders_df[orders_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
-            st.dataframe(matched_orders, use_container_width=True)
-            
-        st.subheader("💬 Matching Feedbacks")
-        if not feedback_df.empty:
-            matched_fb = feedback_df[feedback_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
-            st.dataframe(matched_fb, use_container_width=True)
-    else:
-        st.info("Kripya upar search bar mein koi keyword type karein.")
+        st.subheader("Products Match")
+        st.dataframe(p[p.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)], use_container_width=True)
+        st.subheader("Tasks Match")
+        st.dataframe(t[t.apply(lambda row: row.astype(str).str.contains(q, case=False).any(), axis=1)], use_container_width=True)
 
 elif selected_option == "🛍️ E-Commerce Store":
-    st.title("🛍️ Online Product Store (Prices in ₹)")
-    st.write("Browse products with Brand, Photos, Descriptions, and Features.")
-    
+    st.title("🛍️ Online Product Store (With Barcodes & QR codes)")
     conn = sqlite3.connect('app_database.db')
-    products_df = pd.read_sql_query("SELECT * FROM products", conn)
+    prods = pd.read_sql_query("SELECT * FROM products", conn)
     conn.close()
     
-    if not products_df.empty:
-        cols = st.columns(3)
-        for index, row in products_df.iterrows():
-            col = cols[index % 3]
-            with col:
-                img_src = row['image_url'] if row['image_url'] else "https://via.placeholder.com/300"
-                st.markdown(f"""
-                    <div class="product-card">
-                        <img src="{img_src}" style="width:100%; height:160px; object-fit:cover; border-radius:6px; margin-bottom:10px;">
-                        <h3>{row['name']}</h3>
-                        <p><b>Brand:</b> {row['brand']}</p>
-                        <p><b>Category:</b> {row['category']}</p>
-                        <p><b>Price:</b> ₹{row['price']:,.2f}</p>
-                        <p><b>Stock:</b> {row['stock']}</p>
-                        <p><b>Description:</b> {row['description']}</p>
-                        <p><b>Features:</b> <i>{row['features']}</i></p>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button(f"Add to Cart", key=f"prod_{row['id']}"):
-                    p_id = row['id']
-                    if p_id in st.session_state.cart:
-                        st.session_state.cart[p_id] += 1
-                    else:
-                        st.session_state.cart[p_id] = 1
-                    st.success(f"Added {row['name']} to cart!")
-    else:
-        st.info("No products found in database.")
+    cols = st.columns(3)
+    for i, row in prods.iterrows():
+        with cols[i % 3]:
+            img = row['image_url'] if row['image_url'] else "https://via.placeholder.com/300"
+            st.markdown(f"""
+                <div class="product-card">
+                    <img src="{img}" style="width:100%; height:140px; object-fit:cover; border-radius:6px;">
+                    <h3>{row['name']}</h3>
+                    <p><b>Brand:</b> {row['brand']} | <b>SKU-BARCODE:</b> SKU-{row['id']:03d}</p>
+                    <p><b>Price:</b> ₹{row['price']:,.2f}</p>
+                    <p><b>Stock:</b> {row['stock']}</p>
+                    <p>{row['description']}</p>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Add to Cart", key=f"p_{row['id']}"):
+                st.session_state.cart[row['id']] = st.session_state.cart.get(row['id'], 0) + 1
+                st.success(f"Added {row['name']} to cart!")
 
 elif selected_option == "🛠️ Manage & Edit Products":
-    st.title("🛠️ Product Inventory, Add & Edit Suite")
-    st.write("Naye items add karein ya existing items ki Photos, Brand, Description aur Price update karein.")
-    
-    tab_add, tab_edit = st.tabs(["➕ Add New Item", "✏️ Edit / Update Item"])
-    
-    with tab_add:
-        with st.form("add_product_form"):
-            st.subheader("Add New Product with Full Details")
-            p_name = st.text_input("Product Name")
-            p_brand = st.text_input("Brand Name (e.g., Sony, Nike)")
-            p_price = st.number_input("Price (in ₹)", min_value=1.0, value=999.0)
-            p_stock = st.number_input("Stock Quantity", min_value=1, value=10)
-            p_category = st.selectbox("Category", ["Electronics", "Stationery", "Lifestyle", "Clothing", "Apparel"])
-            p_desc = st.text_area("Product Description")
-            p_feats = st.text_input("Key Features (comma separated)")
-            p_img = st.text_input("Image URL (Optional)")
-            
-            submit_new_prod = st.form_submit_button("Save Product to Store")
-            if submit_new_prod:
-                if p_name and p_brand:
-                    conn = sqlite3.connect('app_database.db')
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "INSERT INTO products (name, brand, price, stock, category, description, features, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (p_name, p_brand, p_price, p_stock, p_category, p_desc, p_feats, p_img)
-                    )
-                    conn.commit()
-                    conn.close()
-                    log_activity(f"New product added: {p_name} ({p_brand})", "Store")
-                    st.success(f"Product '{p_name}' successfully added to store!")
-                    st.rerun()
-                else:
-                    st.warning("Kripya Product Name aur Brand Name zaroor bharein.")
-                    
-    with tab_edit:
-        st.subheader("Edit or Update Existing Product")
-        conn = sqlite3.connect('app_database.db')
-        prod_df = pd.read_sql_query("SELECT * FROM products", conn)
-        conn.close()
-        
-        if not prod_df.empty:
-            selected_prod_id = st.selectbox("Select Product to Edit", options=prod_df['id'].tolist(), format_func=lambda x: prod_df[prod_df['id'] == x]['name'].values[0])
-            
-            current_row = prod_df[prod_df['id'] == selected_prod_id].iloc[0]
-            
-            with st.form("edit_product_form"):
-                e_name = st.text_input("Product Name", value=current_row['name'])
-                e_brand = st.text_input("Brand Name", value=current_row['brand'])
-                e_price = st.number_input("Price (in ₹)", min_value=1.0, value=float(current_row['price']))
-                e_stock = st.number_input("Stock Quantity", min_value=0, value=int(current_row['stock']))
-                e_category = st.text_input("Category", value=current_row['category'])
-                e_desc = st.text_area("Product Description", value=current_row['description'])
-                e_feats = st.text_input("Key Features", value=current_row['features'])
-                e_img = st.text_input("Image URL", value=current_row['image_url'])
-                
-                submit_edit = st.form_submit_button("Update Product Details")
-                if submit_edit:
-                    conn = sqlite3.connect('app_database.db')
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "UPDATE products SET name=?, brand=?, price=?, stock=?, category=?, description=?, features=?, image_url=? WHERE id=?",
-                        (e_name, e_brand, e_price, e_stock, e_category, e_desc, e_feats, e_img, selected_prod_id)
-                    )
-                    conn.commit()
-                    conn.close()
-                    log_activity(f"Updated product ID {selected_prod_id}: {e_name}", "Store")
-                    st.success("Product updated successfully!")
-                    st.rerun()
-        else:
-            st.info("No products available to edit.")
+    st.title("🛠️ Product Inventory Management")
+    if st.session_state.user_role != "Administrator":
+        st.error("Access Denied: Only Administrators can add or edit inventory items.")
+    else:
+        with st.form("add_prod"):
+            name = st.text_input("Name")
+            brand = st.text_input("Brand")
+            price = st.number_input("Price (₹)", value=500.0)
+            stock = st.number_input("Stock", value=10)
+            cat = st.text_input("Category")
+            desc = st.text_area("Description")
+            feats = st.text_input("Features")
+            img = st.text_input("Image URL")
+            if st.form_submit_button("Add Product"):
+                conn = sqlite3.connect('app_database.db')
+                conn.cursor().execute("INSERT INTO products (name, brand, price, stock, category, description, features, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                      (name, brand, price, stock, cat, desc, feats, img))
+                conn.commit()
+                conn.close()
+                st.success("Product added successfully!")
+                st.rerun()
 
-elif selected_option == "🛒 Shopping Cart":
-    st.title("🛒 Your Shopping Cart (Prices in ₹)")
-    st.write("Review your selected items and proceed to checkout.")
-    
+elif selected_option == "🛒 Shopping Cart & GST Checkout":
+    st.title("🛒 Shopping Cart & GST Tax Calculator")
     if st.session_state.cart:
         conn = sqlite3.connect('app_database.db')
-        products_df = pd.read_sql_query("SELECT * FROM products", conn)
+        prods = pd.read_sql_query("SELECT * FROM products", conn)
         conn.close()
         
-        cart_items = []
-        total_price = 0.0
+        items, subtotal = [], 0.0
+        for pid, qty in st.session_state.cart.items():
+            r = prods[prods['id'] == pid].iloc[0]
+            sub = r['price'] * qty
+            subtotal += sub
+            items.append({"Product": f"{r['name']} ({r['brand']})", "Price": r['price'], "Qty": qty, "Subtotal": sub})
+            
+        st.dataframe(pd.DataFrame(items), use_container_width=True)
         
-        for p_id, qty in st.session_state.cart.items():
-            product_row = products_df[products_df['id'] == p_id]
-            if not product_row.empty:
-                p_name = product_row['name'].values[0]
-                p_brand = product_row['brand'].values[0]
-                p_price = product_row['price'].values[0]
-                subtotal = p_price * qty
-                total_price += subtotal
-                cart_items.append({"ID": p_id, "Product": f"{p_name} ({p_brand})", "Price (₹)": f"₹{p_price:,.2f}", "Quantity": qty, "Subtotal (₹)": f"₹{subtotal:,.2f}"})
-                
-        cart_df = pd.DataFrame(cart_items)
-        st.dataframe(cart_df, use_container_width=True)
-        st.markdown(f"### Total Amount: ₹{total_price:,.2f}")
+        # Calculate 18% GST (CGST 9% + SGST 9%)
+        gst = subtotal * 0.18
+        cgst = gst / 2
+        sgst = gst / 2
+        grand_total = subtotal + gst
         
-        col_clear, col_checkout = st.columns(2)
-        with col_clear:
-            if st.button("Clear Cart"):
-                st.session_state.cart = {}
-                st.rerun()
-                
-        with col_checkout:
-            customer_name_input = st.text_input("Customer Name for Order", value="Admin User")
-            if st.button("Place Order Now"):
-                conn = sqlite3.connect('app_database.db')
-                cursor = conn.cursor()
-                items_summary = ", ".join([f"{row['Product']} (x{row['Quantity']})" for row in cart_items])
-                t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                cursor.execute(
-                    "INSERT INTO orders (customer_name, items, total_amount, timestamp) VALUES (?, ?, ?, ?)",
-                    (customer_name_input, items_summary, total_price, t_time)
-                )
-                conn.commit()
-                conn.close()
-                
-                log_activity(f"New order placed by {customer_name_input} for ₹{total_price:,.2f}", "Store")
-                st.success("Order placed successfully! Recorded in database.")
-                st.session_state.cart = {}
-                st.rerun()
+        st.markdown(f"""
+            **Subtotal:** ₹{subtotal:,.2f}  
+            **CGST (9%):** ₹{cgst:,.2f}  
+            **SGST (9%):** ₹{sgst:,.2f}  
+            ### **Grand Total (Incl. GST): ₹{grand_total:,.2f}**
+        """)
+        
+        c_name = st.text_input("Customer Name", value="Admin User")
+        c_email = st.text_input("Email", value="admin@shop.com")
+        c_phone = st.text_input("Phone", value="9876543210")
+        
+        if st.button("Confirm Order & Generate Tax Invoice"):
+            conn = sqlite3.connect('app_database.db')
+            cur = conn.cursor()
+            item_str = ", ".join([f"{i['Product']} (x{i['Qty']})" for i in items])
+            cur.execute("INSERT INTO orders (customer_name, items, subtotal, gst_amount, total_amount, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+                        (c_name, item_str, subtotal, gst, grand_total, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            
+            # CRM update
+            cur.execute("SELECT id, total_purchases FROM customers WHERE name = ?", (c_name,))
+            cm = cur.fetchone()
+            if cm:
+                cur.execute("UPDATE customers SET total_purchases = ? WHERE id = ?", (cm[1] + grand_total, cm[0]))
+            else:
+                cur.execute("INSERT INTO customers (name, email, phone, total_purchases, joined_date) VALUES (?, ?, ?, ?, ?)",
+                            (c_name, c_email, c_phone, grand_total, datetime.now().strftime("%Y-%m-%d")))
+            conn.commit()
+            conn.close()
+            log_activity(f"Order placed by {c_name} for ₹{grand_total:,.2f} (GST Included)", "Store")
+            st.success("Order confirmed successfully!")
+            st.session_state.cart = {}
+            st.rerun()
     else:
-        st.info("Your shopping cart is empty. Visit the 'E-Commerce Store' tab to add products.")
+        st.info("Cart is empty.")
 
-elif selected_option == "📦 Order History":
-    st.title("📦 Customer Orders History (Prices in ₹)")
-    st.write("View all completed e-commerce transactions.")
-    
+elif selected_option == "📦 Order History & Tax Invoices":
+    st.title("📦 Orders & Professional GST Invoices")
     conn = sqlite3.connect('app_database.db')
-    orders_df = pd.read_sql_query("SELECT * FROM orders", conn)
+    orders = pd.read_sql_query("SELECT * FROM orders", conn)
     conn.close()
-    
-    if not orders_df.empty:
-        orders_df['total_amount'] = orders_df['total_amount'].apply(lambda x: f"₹{x:,.2f}")
-        st.dataframe(orders_df, use_container_width=True)
+    if not orders.empty:
+        st.dataframe(orders, use_container_width=True)
+        oid = st.selectbox("Select Order ID for Tax Invoice", options=orders['id'].tolist())
+        o = orders[orders['id'] == oid].iloc[0]
+        
+        inv = f"""
+        ==================================================
+                 OFFICIAL GST TAX INVOICE                 
+        ==================================================
+        Invoice No: GST-INV-{o['id']:04d}
+        Date: {o['timestamp']}
+        Customer: {o['customer_name']}
+        --------------------------------------------------
+        Items Purchased:
+        {o['items']}
+        --------------------------------------------------
+        Subtotal:     ₹{o['subtotal']:,.2f}
+        GST (18%):    ₹{o['gst_amount']:,.2f}
+        --------------------------------------------------
+        Grand Total:  ₹{o['total_amount']:,.2f}
+        ==================================================
+              Thank you for shopping with us!             
+        ==================================================
+        """
+        st.text_area("Invoice Format", value=inv, height=220)
+        st.download_button("Download GST Invoice", data=inv, file_name=f"gst_invoice_{o['id']}.txt")
     else:
-        st.info("No orders found in the database yet.")
+        st.info("No order history found.")
+
+elif selected_option == "👥 Customer CRM & Directory":
+    st.title("👥 Customer CRM Suite")
+    conn = sqlite3.connect('app_database.db')
+    c_df = pd.read_sql_query("SELECT * FROM customers", conn)
+    conn.close()
+    if not c_df.empty:
+        st.dataframe(c_df, use_container_width=True)
+    else:
+        st.info("No customers recorded yet.")
 
 elif selected_option == "👥 User Roles & Permissions":
-    st.title("👥 User Roles & Permissions Management")
-    st.write("Manage staff roles and user access privileges.")
-    
-    with st.form("add_role_form"):
-        st.subheader("Add New Team Member Role")
-        new_user = st.text_input("Username")
-        new_role = st.selectbox("Assign Role", ["Administrator", "Project Manager", "Developer", "Customer Support"])
-        new_status = st.selectbox("Status", ["Active", "Inactive"])
-        
-        submit_role = st.form_submit_button("Save User Role")
-        if submit_role:
-            if new_user:
-                conn = sqlite3.connect('app_database.db')
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO user_roles (username, role, status) VALUES (?, ?, ?)", (new_user, new_role, new_status))
-                conn.commit()
-                conn.close()
-                log_activity(f"Added role for user: {new_user}", "Admin")
-                st.success(f"User {new_user} added with role {new_role}!")
-            else:
-                st.warning("Kripya username enter karein.")
-                
-    st.markdown("---")
-    st.subheader("📋 Current User Roles Directory")
+    st.title("👥 RBAC Security & Roles")
     conn = sqlite3.connect('app_database.db')
-    roles_df = pd.read_sql_query("SELECT * FROM user_roles", conn)
+    r_df = pd.read_sql_query("SELECT * FROM user_roles", conn)
     conn.close()
-    if not roles_df.empty:
-        st.dataframe(roles_df, use_container_width=True)
-    else:
-        st.info("No user roles configured.")
+    st.dataframe(r_df, use_container_width=True)
 
-elif selected_option == "Database Analytics":
-    st.title("📊 Live Database Analytics & Insights")
-    st.write("Yahan aapke saved tasks, products, aur feedback ka visual breakdown dikh raha hai.")
-    
+elif selected_option == "Database Analytics & Sales":
+    st.title("📊 Sales & Revenue Analytics")
     conn = sqlite3.connect('app_database.db')
-    tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
-    feedback_df = pd.read_sql_query("SELECT * FROM feedback", conn)
-    products_df = pd.read_sql_query("SELECT * FROM products", conn)
+    o = pd.read_sql_query("SELECT * FROM orders", conn)
     conn.close()
-    
-    if not tasks_df.empty:
-        st.subheader("📌 Tasks Count by Status")
-        status_counts = tasks_df['status'].value_counts()
-        st.bar_chart(status_counts)
-        
-    if not products_df.empty:
-        st.markdown("---")
-        st.subheader("🛍️ Product Price Distribution (in ₹)")
-        st.bar_chart(products_df.set_index('name')['price'])
-        
-    if not feedback_df.empty:
-        st.markdown("---")
-        st.subheader("⭐ User Feedback Rating Distribution")
-        rating_counts = feedback_df['rating'].value_counts().sort_index()
-        st.bar_chart(rating_counts)
+    if not o.empty:
+        st.bar_chart(o.set_index('id')['total_amount'])
+    else:
+        st.info("No sales data available.")
 
 elif selected_option == "Task Manager (CRUD)":
-    st.title("📝 Project Task Manager (Advanced Search & CRUD)")
-    
-    with st.form("add_task_form"):
-        st.subheader("Add New Task")
+    st.title("📝 Task Manager")
+    with st.form("task"):
         t_name = st.text_input("Task Name")
-        t_status = st.selectbox("Status", ["Pending", "In Progress", "Completed"])
-        t_hours = st.number_input("Estimated Hours", min_value=1, max_value=100, value=5)
-        t_priority = st.selectbox("Priority", ["Low", "Medium", "High"])
-        
-        submit_task = st.form_submit_button("Save Task to DB")
-        
-        if submit_task:
-            if t_name:
-                conn = sqlite3.connect('app_database.db')
-                cursor = conn.cursor()
-                t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                cursor.execute(
-                    "INSERT INTO tasks (task_name, status, hours, priority, timestamp) VALUES (?, ?, ?, ?, ?)",
-                    (t_name, t_status, t_hours, t_priority, t_time)
-                )
-                conn.commit()
-                conn.close()
-                log_activity(f"Added new task: {t_name}", "Tasks")
-                st.success(f"Task '{t_name}' successfully added!")
-            else:
-                st.warning("Kripya Task Name zaroor bharein.")
-
-    st.markdown("---")
-    st.subheader("📋 Search & Manage Database Tasks")
-    
+        stat = st.selectbox("Status", ["Pending", "In Progress", "Completed"])
+        hrs = st.number_input("Hours", value=5)
+        pri = st.selectbox("Priority", ["Low", "Medium", "High"])
+        if st.form_submit_button("Add Task"):
+            conn = sqlite3.connect('app_database.db')
+            conn.cursor().execute("INSERT INTO tasks (task_name, status, hours, priority, timestamp) VALUES (?, ?, ?, ?, ?)",
+                                  (t_name, stat, hrs, pri, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            conn.commit()
+            conn.close()
+            st.success("Task added!")
+            st.rerun()
     conn = sqlite3.connect('app_database.db')
-    tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
+    st.dataframe(pd.read_sql_query("SELECT * FROM tasks", conn), use_container_width=True)
     conn.close()
-    
-    if not tasks_df.empty:
-        search_query = st.text_input("🔍 Search Task by Name")
-        if search_query:
-            tasks_df = tasks_df[tasks_df['task_name'].str.contains(search_query, case=False, na=False)]
-            
-        st.dataframe(tasks_df, use_container_width=True)
-        
-        if not tasks_df.empty:
-            task_ids = tasks_df['id'].tolist()
-            selected_id_to_delete = st.selectbox("Select Task ID to Delete", options=task_ids)
-            if st.button("Delete Selected Task"):
-                conn = sqlite3.connect('app_database.db')
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM tasks WHERE id = ?", (selected_id_to_delete,))
-                conn.commit()
-                conn.close()
-                log_activity(f"Deleted task ID: {selected_id_to_delete}", "Tasks")
-                st.success(f"Task ID {selected_id_to_delete} deleted successfully!")
-                st.rerun()
-    else:
-        st.info("Koi task database mein available nahi hai.")
 
 elif selected_option == "Kanban Board":
-    st.title("📌 Project Kanban Board")
-    st.write("Aapke saare tasks status ke mutabiq columns mein display ho rahe hain.")
-    
+    st.title("📌 Kanban Board")
     conn = sqlite3.connect('app_database.db')
-    tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
+    t = pd.read_sql_query("SELECT * FROM tasks", conn)
     conn.close()
-    
-    if not tasks_df.empty:
-        col_pending, col_progress, col_completed = st.columns(3)
-        
-        with col_pending:
-            st.markdown("### ⏳ Pending")
-            pending_tasks = tasks_df[tasks_df['status'] == 'Pending']
-            for _, row in pending_tasks.iterrows():
-                st.markdown(f"""
-                    <div class="kanban-card" style="border-left-color: #EF4444;">
-                        <strong>{row['task_name']}</strong><br>
-                        <small>Priority: {row['priority']} | Hours: {row['hours']}h</small>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-        with col_progress:
-            st.markdown("### 🔄 In Progress")
-            progress_tasks = tasks_df[tasks_df['status'] == 'In Progress']
-            for _, row in progress_tasks.iterrows():
-                st.markdown(f"""
-                    <div class="kanban-card" style="border-left-color: #F59E0B;">
-                        <strong>{row['task_name']}</strong><br>
-                        <small>Priority: {row['priority']} | Hours: {row['hours']}h</small>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-        with col_completed:
-            st.markdown("### ✅ Completed")
-            completed_tasks = tasks_df[tasks_df['status'] == 'Completed']
-            for _, row in completed_tasks.iterrows():
-                st.markdown(f"""
-                    <div class="kanban-card" style="border-left-color: #10B981;">
-                        <strong>{row['task_name']}</strong><br>
-                        <small>Priority: {row['priority']} | Hours: {row['hours']}h</small>
-                    </div>
-                """, unsafe_allow_html=True)
-    else:
-        st.info("Kanban board ke liye pehle 'Task Manager' se kuch tasks add karein.")
+    if not t.empty:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown("### Pending")
+            for _, r in t[t['status'] == 'Pending'].iterrows():
+                st.markdown(f"<div class='kanban-card'><b>{r['task_name']}</b></div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown("### In Progress")
+            for _, r in t[t['status'] == 'In Progress'].iterrows():
+                st.markdown(f"<div class='kanban-card'><b>{r['task_name']}</b></div>", unsafe_allow_html=True)
+        with c3:
+            st.markdown("### Completed")
+            for _, r in t[t['status'] == 'Completed'].iterrows():
+                st.markdown(f"<div class='kanban-card'><b>{r['task_name']}</b></div>", unsafe_allow_html=True)
 
 elif selected_option == "File Uploader":
-    st.title("📂 Dataset Uploader & Visualizer")
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-    if uploaded_file is not None:
-        user_df = pd.read_csv(uploaded_file)
-        st.success("File successfully loaded!")
-        st.dataframe(user_df.head(), use_container_width=True)
-    else:
-        st.info("Test karne ke liye koi bhi CSV file upload karein.")
+    st.title("📂 Dataset Uploader")
+    f = st.file_uploader("Upload CSV", type="csv")
+    if f:
+        st.dataframe(pd.read_csv(f), use_container_width=True)
 
 elif selected_option == "Feedback":
-    st.title("💬 User Feedback Form")
-    with st.form("feedback_form"):
-        user_name = st.text_input("Aapka Naam")
-        user_email = st.text_input("Email Address")
-        rating = st.slider("Rating (1 to 5)", 1, 5, 5)
-        comments = st.text_area("Apna Feedback Likhein")
-        submitted = st.form_submit_button("Submit Feedback")
-        
-        if submitted:
-            if user_name and comments:
-                conn = sqlite3.connect('app_database.db')
-                cursor = conn.cursor()
-                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                cursor.execute(
-                    "INSERT INTO feedback (name, email, rating, comments, timestamp) VALUES (?, ?, ?, ?, ?)",
-                    (user_name, user_email, rating, comments, current_time)
-                )
-                conn.commit()
-                conn.close()
-                log_activity(f"New feedback received from {user_name}", "Feedback")
-                st.success(f"Shukriya {user_name}! Feedback saved.")
-            else:
-                st.warning("Kripya fields bharein.")
+    st.title("💬 Feedback Form")
+    with st.form("fb"):
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        rating = st.slider("Rating", 1, 5, 5)
+        com = st.text_area("Comments")
+        if st.form_submit_button("Submit"):
+            conn = sqlite3.connect('app_database.db')
+            conn.cursor().execute("INSERT INTO feedback (name, email, rating, comments, timestamp) VALUES (?, ?, ?, ?, ?)",
+                                  (name, email, rating, com, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            conn.commit()
+            conn.close()
+            st.success("Feedback saved!")
 
 elif selected_option == "View Saved Feedback":
-    st.title("📋 Saved Feedbacks from Database")
+    st.title("📋 Saved Feedbacks")
     conn = sqlite3.connect('app_database.db')
-    feedback_df = pd.read_sql_query("SELECT * FROM feedback", conn)
+    st.dataframe(pd.read_sql_query("SELECT * FROM feedback", conn), use_container_width=True)
     conn.close()
-    if not feedback_df.empty:
-        st.dataframe(feedback_df, use_container_width=True)
-    else:
-        st.info("Koi feedback nahi mila.")
 
 elif selected_option == "Reports & Export":
-    st.title("📥 Enterprise Reports & Multi-Sheet Export")
-    st.write("Yahan se aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
-    
+    st.title("📥 Multi-Sheet Enterprise Export")
     conn = sqlite3.connect('app_database.db')
-    tasks_export = pd.read_sql_query("SELECT * FROM tasks", conn)
-    feedback_export = pd.read_sql_query("SELECT * FROM feedback", conn)
-    logs_export = pd.read_sql_query("SELECT * FROM audit_logs", conn)
-    products_export = pd.read_sql_query("SELECT * FROM products", conn)
-    orders_export = pd.read_sql_query("SELECT * FROM orders", conn)
-    roles_export = pd.read_sql_query("SELECT * FROM user_roles", conn)
-    notif_export = pd.read_sql_query("SELECT * FROM notifications", conn)
-    notes_export = pd.read_sql_query("SELECT * FROM team_notes", conn)
+    out = io.BytesIO()
+    with pd.ExcelWriter(out, engine='openpyxl') as writer:
+        pd.read_sql_query("SELECT * FROM tasks", conn).to_excel(writer, sheet_name='Tasks', index=False)
+        pd.read_sql_query("SELECT * FROM products", conn).to_excel(writer, sheet_name='Products', index=False)
+        pd.read_sql_query("SELECT * FROM orders", conn).to_excel(writer, sheet_name='Orders', index=False)
     conn.close()
-    
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        tasks_export.to_excel(writer, sheet_name='Tasks', index=False)
-        feedback_export.to_excel(writer, sheet_name='Feedback', index=False)
-        products_export.to_excel(writer, sheet_name='Products', index=False)
-        orders_export.to_excel(writer, sheet_name='Orders', index=False)
-        roles_export.to_excel(writer, sheet_name='User Roles', index=False)
-        notif_export.to_excel(writer, sheet_name='Notifications', index=False)
-        notes_export.to_excel(writer, sheet_name='Team Notes', index=False)
-        logs_export.to_excel(writer, sheet_name='Audit Logs', index=False)
-    excel_data = output.getvalue()
-    
-    st.download_button(
-        label="📥 Download Complete Enterprise Report (.xlsx)",
-        data=excel_data,
-        file_name='enterprise_master_report.xlsx',
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    st.download_button("Download Master Excel Report", data=out.getvalue(), file_name="master_report.xlsx")
 
 elif selected_option == "Audit Logs":
-    st.title("🛡️ System Audit & Activity Logs")
-    st.write("Yahan aap application ki recent activity aur admin actions track kar sakte hain.")
-    
+    st.title("🛡️ Audit Logs")
     conn = sqlite3.connect('app_database.db')
-    logs_df = pd.read_sql_query("SELECT * FROM audit_logs ORDER BY id DESC", conn)
+    st.dataframe(pd.read_sql_query("SELECT * FROM audit_logs ORDER BY id DESC", conn), use_container_width=True)
     conn.close()
-    
-    if not logs_df.empty:
-        st.dataframe(logs_df, use_container_width=True)
-    else:
-        st.info("Abhi tak koi activity log record nahi hui hai.")
 
 elif selected_option == "Settings":
-    st.title("⚙️ System Settings")
-    
-    dark_mode_toggle = st.toggle("Enable Dark Theme Mode", value=st.session_state.dark_mode)
-    if dark_mode_toggle != st.session_state.dark_mode:
-        st.session_state.dark_mode = dark_mode_toggle
+    st.title("⚙️ Settings")
+    dm = st.toggle("Enable Dark Theme", value=st.session_state.dark_mode)
+    if dm != st.session_state.dark_mode:
+        st.session_state.dark_mode = dm
         st.rerun()
-        
-    if st.button("Save Configurations"):
-        log_activity("System settings updated.", "Settings")
-        st.success("Settings updated successfully!")
