@@ -1,15 +1,36 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import sqlite3
+from datetime import datetime
 
-# 1. Page Configuration
+# 1. Database Setup & Initialization
+def init_db():
+    conn = sqlite3.connect('app_database.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            email TEXT,
+            rating INTEGER,
+            comments TEXT,
+            timestamp TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# 2. Page Configuration
 st.set_page_config(
     page_title="Enterprise Streamlit Dashboard",
     page_layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. Custom CSS Styling
+# 3. Custom CSS Styling
 st.markdown("""
     <style>
     .stApp {
@@ -35,7 +56,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Sidebar & Mock Authentication
+# 4. Sidebar & Mock Authentication
 st.sidebar.title("🔐 Access Control")
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -60,10 +81,10 @@ st.sidebar.markdown("---")
 st.sidebar.title("🎛️ Navigation Panel")
 selected_option = st.sidebar.radio(
     "Go to", 
-    ["Dashboard", "Data Analytics & Filters", "File Uploader", "Feedback", "Settings"]
+    ["Dashboard", "Data Analytics & Filters", "File Uploader", "Feedback", "View Saved Feedback", "Settings"]
 )
 
-# 4. Main Body Content Based on Sidebar Navigation
+# 5. Main Body Content Based on Sidebar Navigation
 if selected_option == "Dashboard":
     st.title("📊 Executive Performance Dashboard")
     st.write("Welcome back! Yahan aapke business ke key metrics hain.")
@@ -88,7 +109,6 @@ elif selected_option == "Data Analytics & Filters":
     st.title("📁 Advanced Data Analytics & Filtering")
     st.write("Apne dataset ko filter karein aur insights dekhein.")
     
-    # Sample DataFrame with more rows
     df = pd.DataFrame({
         'Task': ['Design UI', 'Database Setup', 'API Integration', 'Testing', 'Deployment', 'Documentation'],
         'Status': ['Completed', 'In Progress', 'Pending', 'Pending', 'Completed', 'In Progress'],
@@ -96,7 +116,6 @@ elif selected_option == "Data Analytics & Filters":
         'Priority': ['High', 'High', 'Medium', 'Low', 'High', 'Medium']
     })
     
-    # Interactive Filter widget
     selected_status = st.multiselect(
         "Filter by Status", 
         options=df['Status'].unique(), 
@@ -104,15 +123,12 @@ elif selected_option == "Data Analytics & Filters":
     )
     
     filtered_df = df[df['Status'].isin(selected_status)]
-    
     st.dataframe(filtered_df, use_container_width=True)
     
-    # Bar Chart for Filtered Hours
     if not filtered_df.empty:
         st.subheader("📊 Hours Spent per Task")
         st.bar_chart(filtered_df.set_index('Task')['Hours'])
     
-    # Download Button Feature
     csv_data = filtered_df.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Download Filtered Data as CSV",
@@ -132,14 +148,15 @@ elif selected_option == "File Uploader":
         st.success("File successfully loaded!")
         st.subheader("Data Preview")
         st.dataframe(user_df.head(), use_container_width=True)
-        
         st.subheader("Summary Statistics")
         st.write(user_df.describe())
     else:
         st.info("Test karne ke liye koi bhi CSV file upload karein.")
 
 elif selected_option == "Feedback":
-    st.title("💬 User Feedback Form")
+    st.title("💬 User Feedback Form (SQLite Connected)")
+    st.write("Apna anubhav share karein, data seedha database mein save hoga.")
+    
     with st.form("feedback_form"):
         user_name = st.text_input("Aapka Naam")
         user_email = st.text_input("Email Address")
@@ -150,9 +167,41 @@ elif selected_option == "Feedback":
         
         if submitted:
             if user_name and comments:
-                st.success(f"Shukriya {user_name}! Aapka feedback successfully save ho gaya hai.")
+                # Save data to SQLite database
+                conn = sqlite3.connect('app_database.db')
+                cursor = conn.cursor()
+                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                cursor.execute(
+                    "INSERT INTO feedback (name, email, rating, comments, timestamp) VALUES (?, ?, ?, ?, ?)",
+                    (user_name, user_email, rating, comments, current_time)
+                )
+                conn.commit()
+                conn.close()
+                st.success(f"Shukriya {user_name}! Aapka feedback database mein successfully save ho gaya hai.")
             else:
                 st.warning("Kripya Naam aur Comments fields zaroor bharein.")
+
+elif selected_option == "View Saved Feedback":
+    st.title("📋 Saved Feedbacks from Database")
+    st.write("Yahan aap database mein stored saare user feedbacks dekh sakte hain.")
+    
+    conn = sqlite3.connect('app_database.db')
+    feedback_df = pd.read_sql_query("SELECT * FROM feedback", conn)
+    conn.close()
+    
+    if not feedback_df.empty:
+        st.dataframe(feedback_df, use_container_width=True)
+        
+        # Download feedback as CSV
+        feedback_csv = feedback_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Feedbacks CSV",
+            data=feedback_csv,
+            file_name='saved_feedbacks.csv',
+            mime='text/csv'
+        )
+    else:
+        st.info("Abhi tak koi feedback database mein save nahi hua hai. 'Feedback' section se submit karein.")
 
 elif selected_option == "Settings":
     st.title("⚙️ System Settings")
