@@ -43,14 +43,18 @@ def init_db():
         )
     ''')
     
-    # E-Commerce Products Table
+    # E-Commerce Products Table (Enhanced with Brand, Description, Features, Image URL)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
+            brand TEXT,
             price REAL,
             stock INTEGER,
-            category TEXT
+            category TEXT,
+            description TEXT,
+            features TEXT,
+            image_url TEXT
         )
     ''')
     
@@ -100,13 +104,13 @@ def init_db():
     cursor.execute("SELECT COUNT(*) FROM products")
     if cursor.fetchone()[0] == 0:
         sample_products = [
-            ("Wireless Mouse", 25.99, 50, "Electronics"),
-            ("Mechanical Keyboard", 79.99, 30, "Electronics"),
-            ("Gaming Headset", 49.99, 25, "Electronics"),
-            ("Notebook", 4.99, 100, "Stationery"),
-            ("Coffee Mug", 12.50, 40, "Lifestyle")
+            ("Wireless Mouse", "LogiTech", 1999.00, 50, "Electronics", "Ergonomic wireless mouse with smooth tracking.", "2.4GHz Wireless, 1000 DPI, Long Battery", "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=300"),
+            ("Mechanical Keyboard", "Razer", 5999.00, 30, "Electronics", "RGB mechanical gaming keyboard with blue switches.", "RGB Backlit, Clicky Switches, Anti-ghosting", "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=300"),
+            ("Gaming Headset", "HyperX", 3799.00, 25, "Electronics", "Immersive sound gaming headset with comfy earcups.", "7.1 Surround Sound, Noise Cancelling Mic", "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=300"),
+            ("Notebook", "Classmate", 399.00, 100, "Stationery", "High quality ruled pages notebook for office and college.", "200 Pages, Hardbound, Acid-free paper", "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300"),
+            ("Coffee Mug", "Starbucks", 850.00, 40, "Lifestyle", "Ceramic coffee mug for your daily brew.", "Microwave Safe, 350ml Capacity", "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300")
         ]
-        cursor.executemany("INSERT INTO products (name, price, stock, category) VALUES (?, ?, ?, ?)", sample_products)
+        cursor.executemany("INSERT INTO products (name, brand, price, stock, category, description, features, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", sample_products)
         conn.commit()
 
     # Seed default roles if empty
@@ -139,7 +143,6 @@ def log_activity(action_text, notif_category="System"):
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
-# Light Orange Background (#FFF7ED)
 bg_color = "#0F172A" if st.session_state.dark_mode else "#FFF7ED"
 card_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
 text_color = "#F8FAFC" if st.session_state.dark_mode else "#334155"
@@ -159,7 +162,6 @@ st.markdown(f"""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: {text_color};
     }}
-    /* Fix Sidebar Background and Text Visibility */
     section[data-testid="stSidebar"] {{
         background-color: {sidebar_bg} !important;
         color: {sidebar_text} !important;
@@ -185,17 +187,14 @@ st.markdown(f"""
         color: white !important;
         transform: translateY(-2px);
     }}
-    /* Form Submit Buttons - Emerald Green Gradient */
     div[data-testid="stFormSubmitButton"] > button {{
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important;
         color: white !important;
     }}
-    /* Download Buttons - Sunset Orange/Pink Gradient */
     div[data-testid="stDownloadButton"] > button {{
         background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%) !important;
         color: white !important;
     }}
-    /* Fix Input Fields and Select Boxes Contrast */
     input, textarea, select {{
         background-color: {input_bg} !important;
         color: {input_text} !important;
@@ -247,7 +246,7 @@ st.markdown(f"""
 if "cart" not in st.session_state:
     st.session_state.cart = {}
 
-# 3. Sidebar & Mock Authentication
+# Sidebar & Mock Authentication
 st.sidebar.title("🔐 Access Control")
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -280,6 +279,7 @@ selected_option = st.sidebar.radio(
         "📌 Team Collaboration Notes",
         "🔍 Global Master Search", 
         "🛍️ E-Commerce Store", 
+        "🛠️ Manage & Edit Products",
         "🛒 Shopping Cart", 
         "📦 Order History",
         "👥 User Roles & Permissions",
@@ -295,7 +295,7 @@ selected_option = st.sidebar.radio(
     ]
 )
 
-# 4. Main Body Content Based on Sidebar Navigation
+# Main Body Content Based on Sidebar Navigation
 if selected_option == "Dashboard":
     st.title("📊 Executive Performance Dashboard")
     st.write("Welcome back! Yahan aapke live database metrics aur store statistics hain.")
@@ -414,9 +414,9 @@ elif selected_option == "📌 Team Collaboration Notes":
 
 elif selected_option == "🔍 Global Master Search":
     st.title("🔍 Global Database Search Bar")
-    st.write("Poore database (Tasks, Products, Orders, aur Feedback) mein ek sath keyword search karein.")
+    st.write("Poore database mein ek sath keyword search karein.")
     
-    search_term = st.text_input("Enter search keyword (e.g., Mouse, Admin, Completed):")
+    search_term = st.text_input("Enter search keyword (e.g., Mouse, LogiTech, Completed):")
     
     if search_term:
         conn = sqlite3.connect('app_database.db')
@@ -449,8 +449,8 @@ elif selected_option == "🔍 Global Master Search":
         st.info("Kripya upar search bar mein koi keyword type karein.")
 
 elif selected_option == "🛍️ E-Commerce Store":
-    st.title("🛍️ Online Product Store")
-    st.write("Browse products available in the database and add them to your shopping cart.")
+    st.title("🛍️ Online Product Store (Prices in ₹)")
+    st.write("Browse products with Brand, Photos, Descriptions, and Features.")
     
     conn = sqlite3.connect('app_database.db')
     products_df = pd.read_sql_query("SELECT * FROM products", conn)
@@ -461,12 +461,17 @@ elif selected_option == "🛍️ E-Commerce Store":
         for index, row in products_df.iterrows():
             col = cols[index % 3]
             with col:
+                img_src = row['image_url'] if row['image_url'] else "https://via.placeholder.com/300"
                 st.markdown(f"""
                     <div class="product-card">
+                        <img src="{img_src}" style="width:100%; height:160px; object-fit:cover; border-radius:6px; margin-bottom:10px;">
                         <h3>{row['name']}</h3>
+                        <p><b>Brand:</b> {row['brand']}</p>
                         <p><b>Category:</b> {row['category']}</p>
-                        <p><b>Price:</b> ${row['price']:.2f}</p>
-                        <p><b>Stock Available:</b> {row['stock']}</p>
+                        <p><b>Price:</b> ₹{row['price']:,.2f}</p>
+                        <p><b>Stock:</b> {row['stock']}</p>
+                        <p><b>Description:</b> {row['description']}</p>
+                        <p><b>Features:</b> <i>{row['features']}</i></p>
                     </div>
                 """, unsafe_allow_html=True)
                 
@@ -480,8 +485,80 @@ elif selected_option == "🛍️ E-Commerce Store":
     else:
         st.info("No products found in database.")
 
+elif selected_option == "🛠️ Manage & Edit Products":
+    st.title("🛠️ Product Inventory, Add & Edit Suite")
+    st.write("Naye items add karein ya existing items ki Photos, Brand, Description aur Price update karein.")
+    
+    tab_add, tab_edit = st.tabs(["➕ Add New Item", "✏️ Edit / Update Item"])
+    
+    with tab_add:
+        with st.form("add_product_form"):
+            st.subheader("Add New Product with Full Details")
+            p_name = st.text_input("Product Name")
+            p_brand = st.text_input("Brand Name (e.g., Sony, Nike)")
+            p_price = st.number_input("Price (in ₹)", min_value=1.0, value=999.0)
+            p_stock = st.number_input("Stock Quantity", min_value=1, value=10)
+            p_category = st.selectbox("Category", ["Electronics", "Stationery", "Lifestyle", "Clothing", "Apparel"])
+            p_desc = st.text_area("Product Description")
+            p_feats = st.text_input("Key Features (comma separated)")
+            p_img = st.text_input("Image URL (Optional)")
+            
+            submit_new_prod = st.form_submit_button("Save Product to Store")
+            if submit_new_prod:
+                if p_name and p_brand:
+                    conn = sqlite3.connect('app_database.db')
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "INSERT INTO products (name, brand, price, stock, category, description, features, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (p_name, p_brand, p_price, p_stock, p_category, p_desc, p_feats, p_img)
+                    )
+                    conn.commit()
+                    conn.close()
+                    log_activity(f"New product added: {p_name} ({p_brand})", "Store")
+                    st.success(f"Product '{p_name}' successfully added to store!")
+                    st.rerun()
+                else:
+                    st.warning("Kripya Product Name aur Brand Name zaroor bharein.")
+                    
+    with tab_edit:
+        st.subheader("Edit or Update Existing Product")
+        conn = sqlite3.connect('app_database.db')
+        prod_df = pd.read_sql_query("SELECT * FROM products", conn)
+        conn.close()
+        
+        if not prod_df.empty:
+            selected_prod_id = st.selectbox("Select Product to Edit", options=prod_df['id'].tolist(), format_func=lambda x: prod_df[prod_df['id'] == x]['name'].values[0])
+            
+            current_row = prod_df[prod_df['id'] == selected_prod_id].iloc[0]
+            
+            with st.form("edit_product_form"):
+                e_name = st.text_input("Product Name", value=current_row['name'])
+                e_brand = st.text_input("Brand Name", value=current_row['brand'])
+                e_price = st.number_input("Price (in ₹)", min_value=1.0, value=float(current_row['price']))
+                e_stock = st.number_input("Stock Quantity", min_value=0, value=int(current_row['stock']))
+                e_category = st.text_input("Category", value=current_row['category'])
+                e_desc = st.text_area("Product Description", value=current_row['description'])
+                e_feats = st.text_input("Key Features", value=current_row['features'])
+                e_img = st.text_input("Image URL", value=current_row['image_url'])
+                
+                submit_edit = st.form_submit_button("Update Product Details")
+                if submit_edit:
+                    conn = sqlite3.connect('app_database.db')
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE products SET name=?, brand=?, price=?, stock=?, category=?, description=?, features=?, image_url=? WHERE id=?",
+                        (e_name, e_brand, e_price, e_stock, e_category, e_desc, e_feats, e_img, selected_prod_id)
+                    )
+                    conn.commit()
+                    conn.close()
+                    log_activity(f"Updated product ID {selected_prod_id}: {e_name}", "Store")
+                    st.success("Product updated successfully!")
+                    st.rerun()
+        else:
+            st.info("No products available to edit.")
+
 elif selected_option == "🛒 Shopping Cart":
-    st.title("🛒 Your Shopping Cart")
+    st.title("🛒 Your Shopping Cart (Prices in ₹)")
     st.write("Review your selected items and proceed to checkout.")
     
     if st.session_state.cart:
@@ -496,14 +573,15 @@ elif selected_option == "🛒 Shopping Cart":
             product_row = products_df[products_df['id'] == p_id]
             if not product_row.empty:
                 p_name = product_row['name'].values[0]
+                p_brand = product_row['brand'].values[0]
                 p_price = product_row['price'].values[0]
                 subtotal = p_price * qty
                 total_price += subtotal
-                cart_items.append({"ID": p_id, "Product": p_name, "Price": p_price, "Quantity": qty, "Subtotal": subtotal})
+                cart_items.append({"ID": p_id, "Product": f"{p_name} ({p_brand})", "Price (₹)": f"₹{p_price:,.2f}", "Quantity": qty, "Subtotal (₹)": f"₹{subtotal:,.2f}"})
                 
         cart_df = pd.DataFrame(cart_items)
         st.dataframe(cart_df, use_container_width=True)
-        st.markdown(f"### Total Amount: ${total_price:.2f}")
+        st.markdown(f"### Total Amount: ₹{total_price:,.2f}")
         
         col_clear, col_checkout = st.columns(2)
         with col_clear:
@@ -525,7 +603,7 @@ elif selected_option == "🛒 Shopping Cart":
                 conn.commit()
                 conn.close()
                 
-                log_activity(f"New order placed by {customer_name_input} for ${total_price:.2f}", "Store")
+                log_activity(f"New order placed by {customer_name_input} for ₹{total_price:,.2f}", "Store")
                 st.success("Order placed successfully! Recorded in database.")
                 st.session_state.cart = {}
                 st.rerun()
@@ -533,7 +611,7 @@ elif selected_option == "🛒 Shopping Cart":
         st.info("Your shopping cart is empty. Visit the 'E-Commerce Store' tab to add products.")
 
 elif selected_option == "📦 Order History":
-    st.title("📦 Customer Orders History")
+    st.title("📦 Customer Orders History (Prices in ₹)")
     st.write("View all completed e-commerce transactions.")
     
     conn = sqlite3.connect('app_database.db')
@@ -541,6 +619,7 @@ elif selected_option == "📦 Order History":
     conn.close()
     
     if not orders_df.empty:
+        orders_df['total_amount'] = orders_df['total_amount'].apply(lambda x: f"₹{x:,.2f}")
         st.dataframe(orders_df, use_container_width=True)
     else:
         st.info("No orders found in the database yet.")
@@ -595,7 +674,7 @@ elif selected_option == "Database Analytics":
         
     if not products_df.empty:
         st.markdown("---")
-        st.subheader("🛍️ Product Price Distribution")
+        st.subheader("🛍️ Product Price Distribution (in ₹)")
         st.bar_chart(products_df.set_index('name')['price'])
         
     if not feedback_df.empty:
