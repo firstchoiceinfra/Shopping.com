@@ -5,7 +5,14 @@ import sqlite3
 import io
 from datetime import datetime
 
-# 1. Database Setup & Initialization
+# 1. Page Configuration (Must be the absolute first Streamlit command)
+st.set_page_config(
+    page_title="Enterprise E-Commerce & Dashboard",
+    page_layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 2. Database Setup & Initialization
 def init_db():
     conn = sqlite3.connect('app_database.db')
     cursor = conn.cursor()
@@ -137,13 +144,6 @@ def log_activity(action_text, notif_category="System"):
     
     conn.commit()
     conn.close()
-
-# 2. Page Configuration
-st.set_page_config(
-    page_title="Enterprise E-Commerce & Dashboard",
-    page_layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Initialize Theme State
 if "dark_mode" not in st.session_state:
