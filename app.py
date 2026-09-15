@@ -33,10 +33,27 @@ def init_db():
         )
     ''')
     
+    # Activity Audit Logs Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action TEXT,
+            timestamp TEXT
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
 init_db()
+
+def log_activity(action_text):
+    conn = sqlite3.connect('app_database.db')
+    cursor = conn.cursor()
+    t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("INSERT INTO audit_logs (action, timestamp) VALUES (?, ?)", (action_text, t_time))
+    conn.commit()
+    conn.close()
 
 # 2. Page Configuration
 st.set_page_config(
@@ -82,6 +99,7 @@ if not st.session_state.logged_in:
     if st.sidebar.button("Login"):
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
+            log_activity("Admin logged in successfully.")
             st.rerun()
         else:
             st.sidebar.error("Invalid Credentials (Try admin / admin123)")
@@ -89,6 +107,7 @@ if not st.session_state.logged_in:
 else:
     st.sidebar.success("Logged in as Admin")
     if st.sidebar.button("Logout"):
+        log_activity("Admin logged out.")
         st.session_state.logged_in = False
         st.rerun()
 
@@ -96,7 +115,16 @@ st.sidebar.markdown("---")
 st.sidebar.title("🎛️ Navigation Panel")
 selected_option = st.sidebar.radio(
     "Go to", 
-    ["Dashboard", "Database Analytics", "Task Manager (CRUD)", "File Uploader", "Feedback", "View Saved Feedback", "Settings"]
+    [
+        "Dashboard", 
+        "Database Analytics", 
+        "Task Manager (CRUD)", 
+        "File Uploader", 
+        "Feedback", 
+        "View Saved Feedback", 
+        "Audit Logs", 
+        "Settings"
+    ]
 )
 
 # 5. Main Body Content Based on Sidebar Navigation
@@ -104,7 +132,6 @@ if selected_option == "Dashboard":
     st.title("📊 Executive Performance Dashboard")
     st.write("Welcome back! Yahan aapke live database metrics hain.")
     
-    # Fetch real counts from DB
     conn = sqlite3.connect('app_database.db')
     t_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM tasks", conn)
     f_count_df = pd.read_sql_query("SELECT COUNT(*) as total FROM feedback", conn)
@@ -153,7 +180,7 @@ elif selected_option == "Database Analytics":
         st.bar_chart(rating_counts)
 
 elif selected_option == "Task Manager (CRUD)":
-    st.title("📝 Project Task Manager (Database Powered)")
+    st.title("📝 Project Task Manager (Advanced Search & CRUD)")
     
     with st.form("add_task_form"):
         st.subheader("Add New Task")
@@ -175,30 +202,38 @@ elif selected_option == "Task Manager (CRUD)":
                 )
                 conn.commit()
                 conn.close()
+                log_activity(f"Added new task: {t_name}")
                 st.success(f"Task '{t_name}' successfully added!")
             else:
                 st.warning("Kripya Task Name zaroor bharein.")
 
     st.markdown("---")
-    st.subheader("📋 Current Tasks in Database")
+    st.subheader("📋 Search & Manage Database Tasks")
     
     conn = sqlite3.connect('app_database.db')
     tasks_df = pd.read_sql_query("SELECT * FROM tasks", conn)
     conn.close()
     
     if not tasks_df.empty:
+        # Search & Filter controls
+        search_query = st.text_input("🔍 Search Task by Name")
+        if search_query:
+            tasks_df = tasks_df[tasks_df['task_name'].str.contains(search_query, case=False, na=False)]
+            
         st.dataframe(tasks_df, use_container_width=True)
         
-        task_ids = tasks_df['id'].tolist()
-        selected_id_to_delete = st.selectbox("Select Task ID to Delete", options=task_ids)
-        if st.button("Delete Selected Task"):
-            conn = sqlite3.connect('app_database.db')
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM tasks WHERE id = ?", (selected_id_to_delete,))
-            conn.commit()
-            conn.close()
-            st.success(f"Task ID {selected_id_to_delete} deleted successfully!")
-            st.rerun()
+        if not tasks_df.empty:
+            task_ids = tasks_df['id'].tolist()
+            selected_id_to_delete = st.selectbox("Select Task ID to Delete", options=task_ids)
+            if st.button("Delete Selected Task"):
+                conn = sqlite3.connect('app_database.db')
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM tasks WHERE id = ?", (selected_id_to_delete,))
+                conn.commit()
+                conn.close()
+                log_activity(f"Deleted task ID: {selected_id_to_delete}")
+                st.success(f"Task ID {selected_id_to_delete} deleted successfully!")
+                st.rerun()
     else:
         st.info("Koi task database mein available nahi hai.")
 
@@ -232,6 +267,7 @@ elif selected_option == "Feedback":
                 )
                 conn.commit()
                 conn.close()
+                log_activity(f"New feedback received from {user_name}")
                 st.success(f"Shukriya {user_name}! Feedback saved.")
             else:
                 st.warning("Kripya fields bharein.")
@@ -246,8 +282,22 @@ elif selected_option == "View Saved Feedback":
     else:
         st.info("Koi feedback nahi mila.")
 
+elif selected_option == "Audit Logs":
+    st.title("🛡️ System Audit & Activity Logs")
+    st.write("Yahan aap application ki recent activity aur admin actions track kar sakte hain.")
+    
+    conn = sqlite3.connect('app_database.db')
+    logs_df = pd.read_sql_query("SELECT * FROM audit_logs ORDER BY id DESC", conn)
+    conn.close()
+    
+    if not logs_df.empty:
+        st.dataframe(logs_df, use_container_width=True)
+    else:
+        st.info("Abhi tak koi activity log record nahi hui hai.")
+
 elif selected_option == "Settings":
     st.title("⚙️ System Settings")
     st.toggle("Enable Dark Theme Preview")
     if st.button("Save Configurations"):
+        log_activity("System settings updated.")
         st.success("Settings updated successfully!")
