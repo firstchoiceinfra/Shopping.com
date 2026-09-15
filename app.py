@@ -85,6 +85,17 @@ def init_db():
         )
     ''')
     
+    # Team Notes Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS team_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            content TEXT,
+            author TEXT,
+            timestamp TEXT
+        )
+    ''')
+    
     # Seed default products if table is empty
     cursor.execute("SELECT COUNT(*) FROM products")
     if cursor.fetchone()[0] == 0:
@@ -150,7 +161,7 @@ st.markdown(f"""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: {text_color};
     }}
-    .kanban-card, .product-card {{
+    .kanban-card, .product-card, .note-card {{
         background-color: {card_bg};
         padding: 15px;
         border-radius: 8px;
@@ -211,6 +222,7 @@ selected_option = st.sidebar.radio(
     [
         "Dashboard", 
         "🔔 Notifications Center",
+        "📌 Team Collaboration Notes",
         "🔍 Global Master Search", 
         "🛍️ E-Commerce Store", 
         "🛒 Shopping Cart", 
@@ -289,6 +301,61 @@ elif selected_option == "🔔 Notifications Center":
             st.info(f"**[{row['category']}]** {row['message']} — *{row['timestamp']}*")
     else:
         st.info("Abhi koi naya notification nahi hai.")
+
+elif selected_option == "📌 Team Collaboration Notes":
+    st.title("📌 Team Collaboration & Sticky Notes")
+    st.write("Aap aur aapke team members yahan important announcements aur notes share kar sakte hain.")
+    
+    with st.form("add_note_form"):
+        st.subheader("Create New Team Note")
+        note_title = st.text_input("Note Title")
+        note_content = st.text_area("Note Description / Content")
+        note_author = st.text_input("Author Name", value="Admin")
+        
+        submit_note = st.form_submit_button("Publish Note")
+        if submit_note:
+            if note_title and note_content:
+                conn = sqlite3.connect('app_database.db')
+                cursor = conn.cursor()
+                t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                cursor.execute("INSERT INTO team_notes (title, content, author, timestamp) VALUES (?, ?, ?, ?)", (note_title, note_content, note_author, t_time))
+                conn.commit()
+                conn.close()
+                log_activity(f"New team note published by {note_author}: {note_title}", "Notes")
+                st.success("Note published successfully!")
+                st.rerun()
+            else:
+                st.warning("Kripya title aur content dono bharein.")
+                
+    st.markdown("---")
+    st.subheader("📋 Active Team Notes Board")
+    conn = sqlite3.connect('app_database.db')
+    notes_df = pd.read_sql_query("SELECT * FROM team_notes ORDER BY id DESC", conn)
+    conn.close()
+    
+    if not notes_df.empty:
+        for _, row in notes_df.iterrows():
+            st.markdown(f"""
+                <div class="note-card">
+                    <h4>📌 {row['title']}</h4>
+                    <p>{row['content']}</p>
+                    <small><b>Author:</b> {row['author']} | <b>Posted on:</b> {row['timestamp']}</small>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        note_ids = notes_df['id'].tolist()
+        selected_note_id = st.selectbox("Select Note ID to Delete", options=note_ids)
+        if st.button("Delete Selected Note"):
+            conn = sqlite3.connect('app_database.db')
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM team_notes WHERE id = ?", (selected_note_id,))
+            conn.commit()
+            conn.close()
+            log_activity(f"Deleted note ID: {selected_note_id}", "Notes")
+            st.success("Note deleted successfully!")
+            st.rerun()
+    else:
+        st.info("No team notes available yet.")
 
 elif selected_option == "🔍 Global Master Search":
     st.title("🔍 Global Database Search Bar")
@@ -632,7 +699,7 @@ elif selected_option == "View Saved Feedback":
 
 elif selected_option == "Reports & Export":
     st.title("📥 Enterprise Reports & Multi-Sheet Export")
-    st.write("Yahan से aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
+    st.write("Yahan se aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
     
     conn = sqlite3.connect('app_database.db')
     tasks_export = pd.read_sql_query("SELECT * FROM tasks", conn)
@@ -642,6 +709,7 @@ elif selected_option == "Reports & Export":
     orders_export = pd.read_sql_query("SELECT * FROM orders", conn)
     roles_export = pd.read_sql_query("SELECT * FROM user_roles", conn)
     notif_export = pd.read_sql_query("SELECT * FROM notifications", conn)
+    notes_export = pd.read_sql_query("SELECT * FROM team_notes", conn)
     conn.close()
     
     output = io.BytesIO()
@@ -652,6 +720,7 @@ elif selected_option == "Reports & Export":
         orders_export.to_excel(writer, sheet_name='Orders', index=False)
         roles_export.to_excel(writer, sheet_name='User Roles', index=False)
         notif_export.to_excel(writer, sheet_name='Notifications', index=False)
+        notes_export.to_excel(writer, sheet_name='Team Notes', index=False)
         logs_export.to_excel(writer, sheet_name='Audit Logs', index=False)
     excel_data = output.getvalue()
     
