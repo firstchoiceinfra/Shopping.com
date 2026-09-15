@@ -129,10 +129,7 @@ def log_activity(action_text, notif_category="System"):
     cursor = conn.cursor()
     t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Insert into Audit Logs
     cursor.execute("INSERT INTO audit_logs (action, timestamp) VALUES (?, ?)", (action_text, t_time))
-    
-    # Insert into Notifications
     cursor.execute("INSERT INTO notifications (message, category, timestamp) VALUES (?, ?, ?)", (action_text, notif_category, t_time))
     
     conn.commit()
@@ -142,12 +139,14 @@ def log_activity(action_text, notif_category="System"):
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
-# Dynamic CSS Styling based on Theme Choice (Fixed Table Text Visibility for Dark Mode)
 bg_color = "#0F172A" if st.session_state.dark_mode else "#F8FAFC"
 card_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
 text_color = "#F8FAFC" if st.session_state.dark_mode else "#334155"
+sidebar_text = "#FFFFFF" if st.session_state.dark_mode else "#1E293B"
 table_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
 table_text = "#FFFFFF" if st.session_state.dark_mode else "#000000"
+input_bg = "#334155" if st.session_state.dark_mode else "#FFFFFF"
+input_text = "#FFFFFF" if st.session_state.dark_mode else "#000000"
 
 st.markdown(f"""
     <style>
@@ -155,6 +154,29 @@ st.markdown(f"""
         background-color: {bg_color};
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: {text_color};
+    }}
+    /* Fix Sidebar Text Visibility */
+    section[data-testid="stSidebar"] {{
+        color: {sidebar_text} !important;
+    }}
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] label, 
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] div {{
+        color: {sidebar_text} !important;
+    }}
+    /* Fix Input Fields and Select Boxes Contrast */
+    input, textarea, select {{
+        background-color: {input_bg} !important;
+        color: {input_text} !important;
+    }}
+    div[data-baseweb="input"] input {{
+        background-color: {input_bg} !important;
+        color: {input_text} !important;
+    }}
+    div[data-baseweb="select"] div {{
+        background-color: {input_bg} !important;
+        color: {input_text} !important;
     }}
     .kanban-card, .product-card, .note-card {{
         background-color: {card_bg};
@@ -165,7 +187,6 @@ st.markdown(f"""
         border-left: 5px solid #3B82F6;
         color: {text_color};
     }}
-    /* DataFrame & Table Text Fix for Dark/Light Mode */
     .stDataFrame, .stTable {{
         background-color: {table_bg};
         color: {table_text};
