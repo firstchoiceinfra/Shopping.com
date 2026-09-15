@@ -5,14 +5,7 @@ import sqlite3
 import io
 from datetime import datetime
 
-# 1. Page Configuration (Must be the absolute first Streamlit command)
-st.set_page_config(
-    page_title="Enterprise E-Commerce & Dashboard",
-    page_layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# 2. Database Setup & Initialization
+# 1. Database Setup & Initialization
 def init_db():
     conn = sqlite3.connect('app_database.db')
     cursor = conn.cursor()
@@ -699,7 +692,7 @@ elif selected_option == "View Saved Feedback":
 
 elif selected_option == "Reports & Export":
     st.title("📥 Enterprise Reports & Multi-Sheet Export")
-    st.write("Yahan se aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
+    st.write("Yahan से aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
     
     conn = sqlite3.connect('app_database.db')
     tasks_export = pd.read_sql_query("SELECT * FROM tasks", conn)
