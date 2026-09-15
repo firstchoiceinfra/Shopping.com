@@ -65,6 +65,26 @@ def init_db():
         )
     ''')
     
+    # User Roles Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            role TEXT,
+            status TEXT
+        )
+    ''')
+    
+    # Notifications Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT,
+            category TEXT,
+            timestamp TEXT
+        )
+    ''')
+    
     # Seed default products if table is empty
     cursor.execute("SELECT COUNT(*) FROM products")
     if cursor.fetchone()[0] == 0:
@@ -77,16 +97,33 @@ def init_db():
         ]
         cursor.executemany("INSERT INTO products (name, price, stock, category) VALUES (?, ?, ?, ?)", sample_products)
         conn.commit()
+
+    # Seed default roles if empty
+    cursor.execute("SELECT COUNT(*) FROM user_roles")
+    if cursor.fetchone()[0] == 0:
+        sample_roles = [
+            ("admin", "Administrator", "Active"),
+            ("manager_john", "Project Manager", "Active"),
+            ("dev_sara", "Developer", "Active")
+        ]
+        cursor.executemany("INSERT INTO user_roles (username, role, status) VALUES (?, ?, ?)", sample_roles)
+        conn.commit()
         
     conn.close()
 
 init_db()
 
-def log_activity(action_text):
+def log_activity(action_text, notif_category="System"):
     conn = sqlite3.connect('app_database.db')
     cursor = conn.cursor()
     t_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Insert into Audit Logs
     cursor.execute("INSERT INTO audit_logs (action, timestamp) VALUES (?, ?)", (action_text, t_time))
+    
+    # Insert into Notifications
+    cursor.execute("INSERT INTO notifications (message, category, timestamp) VALUES (?, ?, ?)", (action_text, notif_category, t_time))
+    
     conn.commit()
     conn.close()
 
@@ -97,25 +134,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 3. Custom CSS Styling
-st.markdown("""
+# Initialize Theme State
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
+# Dynamic CSS Styling based on Theme Choice
+bg_color = "#0F172A" if st.session_state.dark_mode else "#F8FAFC"
+card_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
+text_color = "#F8FAFC" if st.session_state.dark_mode else "#334155"
+
+st.markdown(f"""
     <style>
-    .stApp {
-        background-color: #F8FAFC;
+    .stApp {{
+        background-color: {bg_color};
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .kanban-card, .product-card {
-        background-color: white;
+        color: {text_color};
+    }}
+    .kanban-card, .product-card {{
+        background-color: {card_bg};
         padding: 15px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         margin-bottom: 10px;
         border-left: 5px solid #3B82F6;
-    }
-    .stTabs [data-baseweb="tab-list"] {
+    }}
+    .stTabs [data-baseweb="tab-list"] {{
         gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] { 
+    }}
+    .stTabs [data-baseweb="tab"] {{ 
         height: 48px; 
         background: linear-gradient(135deg, #F1F5F9, #E2E8F0); 
         border-radius: 10px 10px 0px 0px;
@@ -123,11 +169,11 @@ st.markdown("""
         padding-right: 20px;
         font-weight: 600;
         color: #334155;
-    }
-    .stTabs [aria-selected="true"] {
+    }}
+    .stTabs [aria-selected="true"] {{
         background: linear-gradient(135deg, #3B82F6, #1D4ED8) !important;
         color: white !important;
-    }
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -135,7 +181,7 @@ st.markdown("""
 if "cart" not in st.session_state:
     st.session_state.cart = {}
 
-# 4. Sidebar & Mock Authentication
+# 3. Sidebar & Mock Authentication
 st.sidebar.title("🔐 Access Control")
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -146,7 +192,7 @@ if not st.session_state.logged_in:
     if st.sidebar.button("Login"):
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
-            log_activity("Admin logged in successfully.")
+            log_activity("Admin logged in successfully.", "Auth")
             st.rerun()
         else:
             st.sidebar.error("Invalid Credentials (Try admin / admin123)")
@@ -154,7 +200,7 @@ if not st.session_state.logged_in:
 else:
     st.sidebar.success("Logged in as Admin")
     if st.sidebar.button("Logout"):
-        log_activity("Admin logged out.")
+        log_activity("Admin logged out.", "Auth")
         st.session_state.logged_in = False
         st.rerun()
 
@@ -164,10 +210,12 @@ selected_option = st.sidebar.radio(
     "Go to", 
     [
         "Dashboard", 
+        "🔔 Notifications Center",
         "🔍 Global Master Search", 
         "🛍️ E-Commerce Store", 
         "🛒 Shopping Cart", 
         "📦 Order History",
+        "👥 User Roles & Permissions",
         "Database Analytics", 
         "Task Manager (CRUD)", 
         "Kanban Board", 
@@ -180,7 +228,7 @@ selected_option = st.sidebar.radio(
     ]
 )
 
-# 5. Main Body Content Based on Sidebar Navigation
+# 4. Main Body Content Based on Sidebar Navigation
 if selected_option == "Dashboard":
     st.title("📊 Executive Performance Dashboard")
     st.write("Welcome back! Yahan aapke live database metrics aur store statistics hain.")
@@ -215,6 +263,32 @@ if selected_option == "Dashboard":
     st.subheader("📈 General Growth Overview")
     chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['This Year', 'Last Year'])
     st.line_chart(chart_data)
+
+elif selected_option == "🔔 Notifications Center":
+    st.title("🔔 Real-Time Notifications Center")
+    st.write("Yahan aapko system ke sabhi recent alerts aur activities ki live feed milegi.")
+    
+    conn = sqlite3.connect('app_database.db')
+    notif_df = pd.read_sql_query("SELECT * FROM notifications ORDER BY id DESC", conn)
+    conn.close()
+    
+    col_clear, col_refresh = st.columns([1, 4])
+    with col_clear:
+        if st.button("Clear All Notifications"):
+            conn = sqlite3.connect('app_database.db')
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM notifications")
+            conn.commit()
+            conn.close()
+            st.success("All notifications cleared!")
+            st.rerun()
+            
+    if not notif_df.empty:
+        st.markdown("---")
+        for _, row in notif_df.iterrows():
+            st.info(f"**[{row['category']}]** {row['message']} — *{row['timestamp']}*")
+    else:
+        st.info("Abhi koi naya notification nahi hai.")
 
 elif selected_option == "🔍 Global Master Search":
     st.title("🔍 Global Database Search Bar")
@@ -329,7 +403,7 @@ elif selected_option == "🛒 Shopping Cart":
                 conn.commit()
                 conn.close()
                 
-                log_activity(f"New order placed by {customer_name_input} for ${total_price:.2f}")
+                log_activity(f"New order placed by {customer_name_input} for ${total_price:.2f}", "Store")
                 st.success("Order placed successfully! Recorded in database.")
                 st.session_state.cart = {}
                 st.rerun()
@@ -348,6 +422,39 @@ elif selected_option == "📦 Order History":
         st.dataframe(orders_df, use_container_width=True)
     else:
         st.info("No orders found in the database yet.")
+
+elif selected_option == "👥 User Roles & Permissions":
+    st.title("👥 User Roles & Permissions Management")
+    st.write("Manage staff roles and user access privileges.")
+    
+    with st.form("add_role_form"):
+        st.subheader("Add New Team Member Role")
+        new_user = st.text_input("Username")
+        new_role = st.selectbox("Assign Role", ["Administrator", "Project Manager", "Developer", "Customer Support"])
+        new_status = st.selectbox("Status", ["Active", "Inactive"])
+        
+        submit_role = st.form_submit_button("Save User Role")
+        if submit_role:
+            if new_user:
+                conn = sqlite3.connect('app_database.db')
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO user_roles (username, role, status) VALUES (?, ?, ?)", (new_user, new_role, new_status))
+                conn.commit()
+                conn.close()
+                log_activity(f"Added role for user: {new_user}", "Admin")
+                st.success(f"User {new_user} added with role {new_role}!")
+            else:
+                st.warning("Kripya username enter karein.")
+                
+    st.markdown("---")
+    st.subheader("📋 Current User Roles Directory")
+    conn = sqlite3.connect('app_database.db')
+    roles_df = pd.read_sql_query("SELECT * FROM user_roles", conn)
+    conn.close()
+    if not roles_df.empty:
+        st.dataframe(roles_df, use_container_width=True)
+    else:
+        st.info("No user roles configured.")
 
 elif selected_option == "Database Analytics":
     st.title("📊 Live Database Analytics & Insights")
@@ -398,7 +505,7 @@ elif selected_option == "Task Manager (CRUD)":
                 )
                 conn.commit()
                 conn.close()
-                log_activity(f"Added new task: {t_name}")
+                log_activity(f"Added new task: {t_name}", "Tasks")
                 st.success(f"Task '{t_name}' successfully added!")
             else:
                 st.warning("Kripya Task Name zaroor bharein.")
@@ -426,7 +533,7 @@ elif selected_option == "Task Manager (CRUD)":
                 cursor.execute("DELETE FROM tasks WHERE id = ?", (selected_id_to_delete,))
                 conn.commit()
                 conn.close()
-                log_activity(f"Deleted task ID: {selected_id_to_delete}")
+                log_activity(f"Deleted task ID: {selected_id_to_delete}", "Tasks")
                 st.success(f"Task ID {selected_id_to_delete} deleted successfully!")
                 st.rerun()
     else:
@@ -508,7 +615,7 @@ elif selected_option == "Feedback":
                 )
                 conn.commit()
                 conn.close()
-                log_activity(f"New feedback received from {user_name}")
+                log_activity(f"New feedback received from {user_name}", "Feedback")
                 st.success(f"Shukriya {user_name}! Feedback saved.")
             else:
                 st.warning("Kripya fields bharein.")
@@ -525,7 +632,7 @@ elif selected_option == "View Saved Feedback":
 
 elif selected_option == "Reports & Export":
     st.title("📥 Enterprise Reports & Multi-Sheet Export")
-    st.write("Yahan se aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
+    st.write("Yahan से aap poore database ka data ek hi Excel workbook mein download kar sakte hain.")
     
     conn = sqlite3.connect('app_database.db')
     tasks_export = pd.read_sql_query("SELECT * FROM tasks", conn)
@@ -533,6 +640,8 @@ elif selected_option == "Reports & Export":
     logs_export = pd.read_sql_query("SELECT * FROM audit_logs", conn)
     products_export = pd.read_sql_query("SELECT * FROM products", conn)
     orders_export = pd.read_sql_query("SELECT * FROM orders", conn)
+    roles_export = pd.read_sql_query("SELECT * FROM user_roles", conn)
+    notif_export = pd.read_sql_query("SELECT * FROM notifications", conn)
     conn.close()
     
     output = io.BytesIO()
@@ -541,6 +650,8 @@ elif selected_option == "Reports & Export":
         feedback_export.to_excel(writer, sheet_name='Feedback', index=False)
         products_export.to_excel(writer, sheet_name='Products', index=False)
         orders_export.to_excel(writer, sheet_name='Orders', index=False)
+        roles_export.to_excel(writer, sheet_name='User Roles', index=False)
+        notif_export.to_excel(writer, sheet_name='Notifications', index=False)
         logs_export.to_excel(writer, sheet_name='Audit Logs', index=False)
     excel_data = output.getvalue()
     
@@ -566,7 +677,12 @@ elif selected_option == "Audit Logs":
 
 elif selected_option == "Settings":
     st.title("⚙️ System Settings")
-    st.toggle("Enable Dark Theme Preview")
+    
+    dark_mode_toggle = st.toggle("Enable Dark Theme Mode", value=st.session_state.dark_mode)
+    if dark_mode_toggle != st.session_state.dark_mode:
+        st.session_state.dark_mode = dark_mode_toggle
+        st.rerun()
+        
     if st.button("Save Configurations"):
-        log_activity("System settings updated.")
+        log_activity("System settings updated.", "Settings")
         st.success("Settings updated successfully!")
