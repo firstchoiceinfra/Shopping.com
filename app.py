@@ -3,8 +3,14 @@ import pandas as pd
 import numpy as np
 import sqlite3
 import io
-import plotly.express as px
 from datetime import datetime
+
+# Safe Plotly Import with Fallback
+try:
+    import plotly.express as px
+    HAS_PLOTLY = True
+except ImportError:
+    HAS_PLOTLY = False
 
 # 1. Database Setup & Initialization
 def init_db():
@@ -22,13 +28,8 @@ def init_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS user_roles (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, role TEXT, status TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, category TEXT, timestamp TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS team_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, author TEXT, timestamp TEXT)''')
-    
-    # New tables for Attendance & Payroll
     cursor.execute('''CREATE TABLE IF NOT EXISTS attendance (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_name TEXT, date TEXT, status TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS payroll (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_name TEXT, basic_salary REAL, bonus REAL, total_payout REAL, month TEXT)''')
-    
-    # Archive tables
-    cursor.execute('''CREATE TABLE IF NOT EXISTS archive_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, task_name TEXT, status TEXT, hours INTEGER, priority TEXT, timestamp TEXT)''')
 
     # Seed products if empty
     cursor.execute("SELECT COUNT(*) FROM products")
@@ -68,7 +69,6 @@ if "dark_mode" not in st.session_state:
 if "lang" not in st.session_state:
     st.session_state.lang = "English"
 
-# Translations Dictionary
 trans = {
     "English": {
         "dashboard": "Executive Performance Dashboard",
@@ -87,26 +87,95 @@ trans = {
 }
 t = trans[st.session_state.lang]
 
-bg_color = "#0F172A" if st.session_state.dark_mode else "#FFF7ED"
-card_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
-text_color = "#F8FAFC" if st.session_state.dark_mode else "#334155"
-sidebar_bg = "#1E293B" if st.session_state.dark_mode else "#F1F5F9"
-sidebar_text = "#FFFFFF" if st.session_state.dark_mode else "#1E293B"
-table_bg = "#1E293B" if st.session_state.dark_mode else "#FFFFFF"
-table_text = "#FFFFFF" if st.session_state.dark_mode else "#000000"
-input_bg = "#334155" if st.session_state.dark_mode else "#FFFFFF"
-input_text = "#FFFFFF" if st.session_state.dark_mode else "#000000"
+# High-Contrast Color Palette Definition
+if st.session_state.dark_mode:
+    bg_color = "#0B0F19"
+    card_bg = "#1E293B"
+    text_color = "#F8FAFC"
+    sidebar_bg = "#111827"
+    sidebar_text = "#F8FAFC"
+    input_bg = "#334155"
+    input_text = "#FFFFFF"
+    table_bg = "#1E293B"
+    table_text = "#FFFFFF"
+else:
+    bg_color = "#FFF7ED"       # Clean soft light orange background
+    card_bg = "#FFFFFF"        # Pure white cards for maximum contrast
+    text_color = "#1E293B"     # Deep dark slate text for crisp readability
+    sidebar_bg = "#F1F5F9"     # Clean soft light gray sidebar
+    sidebar_text = "#0F172A"   # Dark high-contrast sidebar text
+    input_bg = "#FFFFFF"       # White input background
+    input_text = "#0F172A"     # Deep dark text inside inputs so it's clearly visible
+    table_bg = "#FFFFFF"
+    table_text = "#0F172A"
 
 st.markdown(f"""
     <style>
-    .stApp {{ background-color: {bg_color}; font-family: 'Segoe UI', sans-serif; color: {text_color}; }}
-    section[data-testid="stSidebar"] {{ background-color: {sidebar_bg} !important; color: {sidebar_text} !important; }}
-    section[data-testid="stSidebar"] span, section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] div {{ color: {sidebar_text} !important; }}
-    .stButton > button {{ background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important; color: white !important; border-radius: 8px !important; font-weight: bold !important; }}
-    div[data-testid="stFormSubmitButton"] > button {{ background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important; color: white !important; }}
-    div[data-testid="stDownloadButton"] > button {{ background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%) !important; color: white !important; }}
-    input, textarea, select {{ background-color: {input_bg} !important; color: {input_text} !important; }}
-    .kanban-card, .product-card, .note-card {{ background-color: {card_bg}; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #3B82F6; color: {text_color}; }}
+    .stApp {{ 
+        background-color: {bg_color}; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        color: {text_color}; 
+    }}
+    section[data-testid="stSidebar"] {{ 
+        background-color: {sidebar_bg} !important; 
+        color: {sidebar_text} !important; 
+        border-right: 1px solid #E2E8F0;
+    }}
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] label, 
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] div {{ 
+        color: {sidebar_text} !important; 
+        font-weight: 500;
+    }}
+    /* High-Contrast Inputs & Select Boxes */
+    input, textarea, select {{ 
+        background-color: {input_bg} !important; 
+        color: {input_text} !important; 
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 6px !important;
+    }}
+    div[data-baseweb="input"] input, div[data-baseweb="select"] div {{ 
+        background-color: {input_bg} !important; 
+        color: {input_text} !important; 
+    }}
+    /* Buttons Styling */
+    .stButton > button {{ 
+        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%) !important; 
+        color: white !important; 
+        border-radius: 8px !important; 
+        font-weight: bold !important; 
+        border: none !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }}
+    div[data-testid="stFormSubmitButton"] > button {{ 
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important; 
+        color: white !important; 
+        font-weight: bold !important;
+    }}
+    div[data-testid="stDownloadButton"] > button {{ 
+        background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%) !important; 
+        color: white !important; 
+        font-weight: bold !important;
+    }}
+    /* Cards & Containers */
+    .kanban-card, .product-card, .note-card {{ 
+        background-color: {card_bg}; 
+        padding: 18px; 
+        border-radius: 10px; 
+        margin-bottom: 15px; 
+        border-left: 6px solid #2575fc; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        color: {text_color}; 
+    }}
+    /* Tables & DataFrames */
+    .stDataFrame, .stTable {{ 
+        background-color: {table_bg} !important; 
+        color: {table_text} !important; 
+    }}
+    div[data-testid="stDataFrame"] div {{ 
+        color: {table_text} !important; 
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -370,13 +439,16 @@ elif selected_option == "👥 User Roles & Permissions":
     conn.close()
 
 elif selected_option == "Database Analytics & Sales":
-    st.title("📊 Interactive Plotly Sales Analytics")
+    st.title("📊 Sales Analytics")
     conn = sqlite3.connect('app_database.db')
     orders = pd.read_sql_query("SELECT * FROM orders", conn)
     conn.close()
     if not orders.empty:
-        fig = px.bar(orders, x='id', y='total_amount', title="Order-wise Revenue Breakdown (₹)", color='total_amount')
-        st.plotly_chart(fig, use_container_width=True)
+        if HAS_PLOTLY:
+            fig = px.bar(orders, x='id', y='total_amount', title="Order-wise Revenue Breakdown (₹)", color='total_amount')
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.bar_chart(orders.set_index('id')['total_amount'])
     else:
         st.info("No data for analytics yet.")
 
